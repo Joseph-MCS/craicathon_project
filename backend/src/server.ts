@@ -42,6 +42,10 @@ type VoiceChatRequest = {
   mimeType?: string;
 };
 
+type TranslateRequest = {
+  text?: string;
+};
+
 type OpenAIErrorPayload = {
   error?: {
     message?: string;
@@ -376,6 +380,52 @@ async function generateIrishReply(message: string, history: ClientMessage[]): Pr
   return reply;
 }
 
+async function translateIrishToEnglish(text: string): Promise<string> {
+  ensureConfigured();
+
+  const response = await fetch(`${OPENAI_API_BASE}/responses`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: CHAT_MODEL,
+      max_output_tokens: 80,
+      reasoning: {
+        effort: 'minimal'
+      },
+      instructions:
+        'You translate Irish (Gaeilge) words and short phrases into English. Return only the best natural English translation with no explanation or extra formatting.',
+      input: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text
+            }
+          ]
+        }
+      ]
+    })
+  });
+
+  const payload = (await response.json()) as OpenAIResponsePayload;
+
+  if (!response.ok) {
+    throw new Error(extractOpenAIError(payload));
+  }
+
+  const translation = readResponseText(payload);
+
+  if (!translation) {
+    throw new Error('OpenAI returned an empty translation.');
+  }
+
+  return translation;
+}
+
 async function synthesizeIrishReply(text: string): Promise<{ audioBase64: string; audioMimeType: string }> {
   ensureConfigured();
 
@@ -464,6 +514,30 @@ app.post('/api/voice-chat', async (req, res) => {
     });
   } catch (error) {
     console.error('Voice pipeline failed:', error);
+    return res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/translate', async (req, res) => {
+  const { text } = req.body as TranslateRequest;
+  const cleanText = typeof text === 'string' ? text.trim() : '';
+
+  if (!cleanText) {
+    return res.status(400).json({ error: 'Text is required.' });
+  }
+
+  if (cleanText.length > 280) {
+    return res.status(400).json({ error: 'Text is too long. Select a short word or phrase.' });
+  }
+
+  try {
+    const translation = await translateIrishToEnglish(cleanText);
+
+    return res.json({
+      translation
+    });
+  } catch (error) {
+    console.error('Translation failed:', error);
     return res.status(500).json({ error: getErrorMessage(error) });
   }
 });
