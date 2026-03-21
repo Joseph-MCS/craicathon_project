@@ -1,0 +1,16 @@
+{
+  "name": "craicathon-root",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "build": "npm run build --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

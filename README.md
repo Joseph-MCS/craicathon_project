@@ -1,52 +1,44 @@
-# Craicathon 2026 - Setup Instructions
+# Craicathon 2026 - Irish Language Learning App
 
-Because of environment limitations preventing directory creation, all files have been created in the root directory. 
+## Project Status: Configuration Complete
 
-## Automated Setup (Recommended)
+All necessary configuration files have been created. You just need to install dependencies and start the servers.
 
-Run the following command to automatically organize the project structure:
+## Prerequisites
 
+- Node.js (v18+)
+- npm
+
+## Quick Start
+
+### 1. Install Backend Dependencies
 ```bash
-node setup_project.js
+cd backend
+npm install
 ```
 
-This will create `frontend` and `backend` directories and move the files into place.
-
-## Manual Setup (If automated fails)
-
-Please manually move the files to the following structure:
-
-```
-/craicathon_project
-  /backend
-    /src
-      server.ts (Move server.ts here)
-    package.json (Run npm init and install express cors axios)
-    tsconfig.json
-  /frontend
-    /src
-      /components
-        ConversationInterface.tsx (Move ConversationInterface.tsx here)
-      App.tsx
-      main.tsx
-    package.json (Run npm init and install react react-dom axios vite)
-    tsconfig.json
+### 2. Start Backend Server
+```bash
+npm run dev
+# Server runs on http://localhost:3001
 ```
 
-## Running the Backend
+### 3. Install Frontend Dependencies
+Open a new terminal:
+```bash
+cd frontend
+npm install
+```
 
-1. Navigate to `backend` folder.
-2. Run `npm install express cors axios typescript ts-node @types/express @types/cors @types/node`.
-3. Run `npx ts-node src/server.ts`.
+### 4. Start Frontend Application
+```bash
+npm run dev
+# App runs on http://localhost:5173
+```
 
-## Running the Frontend
+## Troubleshooting
 
-1. Navigate to `frontend` folder.
-2. Run `npm create vite@latest .` (Choose React + TypeScript).
-3. Install dependencies: `npm install axios`.
-4. Copy `ConversationInterface.tsx` to `src/components`.
-5. Import and use `ConversationInterface` in `App.tsx`.
-6. Run `npm run dev`.
+If you see errors like "Cannot find module", ensure you have run `npm install` in both directories.
 
 ## Features Implemented
 
