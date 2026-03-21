@@ -57,6 +57,7 @@ type Flashcard = {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 const FLASHCARD_STORAGE_KEY = 'craicathon.flashcards.v1';
+const USER_OPENAI_KEY_STORAGE_KEY = 'craicathon.user_openai_key.v1';
 const RECORDER_MIME_TYPES = [
   'audio/webm;codecs=opus',
   'audio/webm',
@@ -234,6 +235,8 @@ export default function ConversationInterface() {
   const [selectedIrishText, setSelectedIrishText] = useState('');
   const [lastAudio, setLastAudio] = useState<{ base64: string; mimeType: string } | null>(null);
   const [flashcards, setFlashcards] = useState<Flashcard[]>(() => loadStoredFlashcards());
+  const [userApiKey, setUserApiKey] = useState('');
+  const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
   const [revealedCardIds, setRevealedCardIds] = useState<Record<string, boolean>>({});
   const messagesRef = useRef<Message[]>([]);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -279,6 +282,50 @@ export default function ConversationInterface() {
     window.localStorage.setItem(FLASHCARD_STORAGE_KEY, JSON.stringify(flashcards));
   }, [flashcards]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedKey = window.localStorage.getItem(USER_OPENAI_KEY_STORAGE_KEY);
+    if (storedKey) {
+      setUserApiKey(storedKey);
+    }
+  }, []);
+
+  function buildApiHeaders(includeJsonContentType = true): HeadersInit {
+    const headers: Record<string, string> = {};
+
+    if (includeJsonContentType) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const trimmedKey = userApiKey.trim();
+    if (trimmedKey) {
+      headers['x-openai-api-key'] = trimmedKey;
+    }
+
+    return headers;
+  }
+
+  function persistUserApiKey() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const trimmedKey = userApiKey.trim();
+    if (!trimmedKey) {
+      window.localStorage.removeItem(USER_OPENAI_KEY_STORAGE_KEY);
+      setErrorText('Stored key removed. Add your API key again to use chat features.');
+      return;
+    }
+
+    window.localStorage.setItem(USER_OPENAI_KEY_STORAGE_KEY, trimmedKey);
+    setErrorText(null);
+    setStatusText('API key saved in this browser. Rechecking backend status...');
+    void loadHealth();
+  }
+
   function stopStreamTracks() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -286,12 +333,14 @@ export default function ConversationInterface() {
 
   async function loadHealth() {
     try {
-      const response = await fetch(`${API_BASE}/api/health`);
+      const response = await fetch(`${API_BASE}/api/health`, {
+        headers: buildApiHeaders(false)
+      });
       const payload = (await response.json()) as HealthResponse;
       setHealth(payload);
 
       if (!payload.configured) {
-        setErrorText('OPENAI_API_KEY is missing on the backend.');
+        setErrorText('No API key found. Add one below to enable chat/voice in this browser.');
       }
     } catch (error) {
       console.error(error);
@@ -358,9 +407,7 @@ export default function ConversationInterface() {
     try {
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: buildApiHeaders(),
         body: JSON.stringify({
           history,
           message: trimmedMessage
@@ -397,9 +444,7 @@ export default function ConversationInterface() {
       const audioBase64 = await blobToBase64(blob);
       const response = await fetch(`${API_BASE}/api/voice-chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: buildApiHeaders(),
         body: JSON.stringify({
           audioBase64,
           history,
@@ -433,8 +478,8 @@ export default function ConversationInterface() {
       return;
     }
 
-    if (!health?.configured) {
-      setErrorText('The backend is not configured with OPENAI_API_KEY yet.');
+    if (!health?.configured && !userApiKey.trim()) {
+      setErrorText('Add an OpenAI API key before recording.');
       return;
     }
 
@@ -528,8 +573,8 @@ export default function ConversationInterface() {
       return;
     }
 
-    if (!health?.configured) {
-      setSelectionStatus('Backend is not configured with OPENAI_API_KEY yet.');
+    if (!health?.configured && !userApiKey.trim()) {
+      setSelectionStatus('Add an OpenAI API key to translate selected phrases.');
       return;
     }
 
@@ -547,9 +592,7 @@ export default function ConversationInterface() {
     try {
       const response = await fetch(`${API_BASE}/api/translate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: buildApiHeaders(),
         body: JSON.stringify({
           text: phrase
         })
@@ -674,6 +717,27 @@ export default function ConversationInterface() {
           </span>
           <span className={`pill ${isRecording ? 'pill-recording' : 'pill-calm'}`}>{readyLabel}</span>
         </div>
+
+        {!health?.configured && (
+          <div className="api-key-panel">
+            <label htmlFor="user-openai-key">Enter your OpenAI API key for this browser session</label>
+            <div className="api-key-row">
+              <input
+                id="user-openai-key"
+                type={isApiKeyVisible ? 'text' : 'password'}
+                value={userApiKey}
+                onChange={(event) => setUserApiKey(event.target.value)}
+                placeholder="sk-..."
+                autoComplete="off"
+              />
+              <button type="button" className="secondary-button" onClick={() => setIsApiKeyVisible((current) => !current)}>
+                {isApiKeyVisible ? 'Hide' : 'Show'}
+              </button>
+              <button type="button" onClick={persistUserApiKey}>Save Key</button>
+            </div>
+            <p className="hint">Stored only in your browser local storage and sent as a request header to this backend.</p>
+          </div>
+        )}
       </section>
 
       <section className="panel-tabs" aria-label="Views">
@@ -733,7 +797,7 @@ export default function ConversationInterface() {
                 <div className="voice-controls">
                   <button
                     className={`record-button ${isRecording ? 'is-active' : ''}`}
-                    disabled={!canRecord || isBusy || !health?.configured}
+                    disabled={!canRecord || isBusy || (!health?.configured && !userApiKey.trim())}
                     onClick={() => void (isRecording ? stopRecording() : startRecording())}
                     type="button"
                   >

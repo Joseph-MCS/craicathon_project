@@ -3,6 +3,7 @@ import cors from 'cors';
 import express from 'express';
 import { existsSync } from 'fs';
 import path from 'path';
+import type { Request } from 'express';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -475,14 +476,24 @@ function extensionFromMimeType(mimeType: string): string {
   return 'webm';
 }
 
-function ensureConfigured() {
-  if (!OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is missing. Add it to the repo root .env file and restart the server.');
+function resolveOpenAIKey(req?: Request): string | null {
+  const headerKey = req?.header('x-openai-api-key')?.trim();
+
+  if (headerKey) {
+    return headerKey;
+  }
+
+  return OPENAI_API_KEY ?? null;
+}
+
+function ensureConfiguredWithKey(apiKey: string | null) {
+  if (!apiKey) {
+    throw new Error('OpenAI API key is missing. Add OPENAI_API_KEY on the backend or provide one in the app settings.');
   }
 }
 
-async function transcribeIrishAudio(audioBase64: string, mimeType: string): Promise<string> {
-  ensureConfigured();
+async function transcribeIrishAudio(audioBase64: string, mimeType: string, apiKey: string): Promise<string> {
+  ensureConfiguredWithKey(apiKey);
 
   const audioBuffer = Buffer.from(audioBase64, 'base64');
 
@@ -516,7 +527,7 @@ async function transcribeIrishAudio(audioBase64: string, mimeType: string): Prom
   const response = await fetch(`${OPENAI_API_BASE}/audio/transcriptions`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`
+      Authorization: `Bearer ${apiKey}`
     },
     body: formData
   });
@@ -536,8 +547,8 @@ async function transcribeIrishAudio(audioBase64: string, mimeType: string): Prom
   return transcript;
 }
 
-async function generateIrishReply(message: string, history: ClientMessage[]): Promise<string> {
-  ensureConfigured();
+async function generateIrishReply(message: string, history: ClientMessage[], apiKey: string): Promise<string> {
+  ensureConfiguredWithKey(apiKey);
 
   const input = [
     ...history.map((item) => ({
@@ -563,7 +574,7 @@ async function generateIrishReply(message: string, history: ClientMessage[]): Pr
   const response = await fetch(`${OPENAI_API_BASE}/responses`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -592,13 +603,13 @@ async function generateIrishReply(message: string, history: ClientMessage[]): Pr
   return reply;
 }
 
-async function translateIrishToEnglish(text: string): Promise<string> {
-  ensureConfigured();
+async function translateIrishToEnglish(text: string, apiKey: string): Promise<string> {
+  ensureConfiguredWithKey(apiKey);
 
   const response = await fetch(`${OPENAI_API_BASE}/responses`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -638,13 +649,13 @@ async function translateIrishToEnglish(text: string): Promise<string> {
   return translation;
 }
 
-async function generateIrishPhoneticPronunciation(text: string): Promise<string> {
-  ensureConfigured();
+async function generateIrishPhoneticPronunciation(text: string, apiKey: string): Promise<string> {
+  ensureConfiguredWithKey(apiKey);
 
   const response = await fetch(`${OPENAI_API_BASE}/responses`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -687,13 +698,13 @@ async function generateIrishPhoneticPronunciation(text: string): Promise<string>
   return pronunciation;
 }
 
-async function synthesizeIrishReply(text: string): Promise<{ audioBase64: string; audioMimeType: string }> {
-  ensureConfigured();
+async function synthesizeIrishReply(text: string, apiKey: string): Promise<{ audioBase64: string; audioMimeType: string }> {
+  ensureConfiguredWithKey(apiKey);
 
   const response = await fetch(`${OPENAI_API_BASE}/audio/speech`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -718,9 +729,11 @@ async function synthesizeIrishReply(text: string): Promise<{ audioBase64: string
   };
 }
 
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', (req, res) => {
+  const apiKey = resolveOpenAIKey(req);
+
   res.json({
-    configured: Boolean(OPENAI_API_KEY),
+    configured: Boolean(apiKey),
     ollamaConfigured: Boolean(OLLAMA_API_KEY),
     models: {
       chat: CHAT_MODEL,
@@ -736,15 +749,17 @@ app.get('/api/health', (_req, res) => {
 
 app.post('/api/chat', async (req, res) => {
   const { history, message } = req.body as TextChatRequest;
+  const apiKey = resolveOpenAIKey(req);
   const cleanedMessage = typeof message === 'string' ? message.trim() : '';
 
   if (!cleanedMessage) {
     return res.status(400).json({ error: 'Message text is required.' });
   }
   try {
+    ensureConfiguredWithKey(apiKey);
     const safeHistory = sanitizeHistory(history);
-    const reply = await generateIrishReply(cleanedMessage, safeHistory);
-    const speech = await synthesizeIrishReply(reply);
+    const reply = await generateIrishReply(cleanedMessage, safeHistory, apiKey as string);
+    const speech = await synthesizeIrishReply(reply, apiKey as string);
 
     return res.json({
       ...speech,
@@ -759,16 +774,18 @@ app.post('/api/chat', async (req, res) => {
 
 app.post('/api/voice-chat', async (req, res) => {
   const { audioBase64, history, mimeType } = req.body as VoiceChatRequest;
+  const apiKey = resolveOpenAIKey(req);
 
   if (typeof audioBase64 !== 'string' || audioBase64.trim().length === 0) {
     return res.status(400).json({ error: 'Audio data is required.' });
   }
 
   try {
+    ensureConfiguredWithKey(apiKey);
     const safeHistory = sanitizeHistory(history);
-    const transcript = await transcribeIrishAudio(audioBase64, mimeType || 'audio/webm');
-    const reply = await generateIrishReply(transcript, safeHistory);
-    const speech = await synthesizeIrishReply(reply);
+    const transcript = await transcribeIrishAudio(audioBase64, mimeType || 'audio/webm', apiKey as string);
+    const reply = await generateIrishReply(transcript, safeHistory, apiKey as string);
+    const speech = await synthesizeIrishReply(reply, apiKey as string);
 
     return res.json({
       ...speech,
@@ -784,6 +801,7 @@ app.post('/api/voice-chat', async (req, res) => {
 
 app.post('/api/translate', async (req, res) => {
   const { text } = req.body as TranslateRequest;
+  const apiKey = resolveOpenAIKey(req);
   const cleanText = typeof text === 'string' ? text.trim() : '';
 
   if (!cleanText) {
@@ -795,9 +813,10 @@ app.post('/api/translate', async (req, res) => {
   }
 
   try {
+    ensureConfiguredWithKey(apiKey);
     const [translation, pronunciation] = await Promise.all([
-      translateIrishToEnglish(cleanText),
-      generateIrishPhoneticPronunciation(cleanText)
+      translateIrishToEnglish(cleanText, apiKey as string),
+      generateIrishPhoneticPronunciation(cleanText, apiKey as string)
     ]);
 
     return res.json({
@@ -812,6 +831,7 @@ app.post('/api/translate', async (req, res) => {
 
 app.post('/api/pronunciation', async (req, res) => {
   const { text } = req.body as PronunciationRequest;
+  const apiKey = resolveOpenAIKey(req);
   const cleanText = typeof text === 'string' ? text.trim() : '';
 
   if (!cleanText) {
@@ -823,7 +843,8 @@ app.post('/api/pronunciation', async (req, res) => {
   }
 
   try {
-    const pronunciation = await generateIrishPhoneticPronunciation(cleanText);
+    ensureConfiguredWithKey(apiKey);
+    const pronunciation = await generateIrishPhoneticPronunciation(cleanText, apiKey as string);
 
     return res.json({
       pronunciation

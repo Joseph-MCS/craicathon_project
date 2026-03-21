@@ -1560,6 +1560,37 @@ button.recording {
   color: #90a7a6;
 }
 
+.api-key-panel {
+  margin-top: 0.9rem;
+  border: 1px solid rgba(220, 173, 80, 0.35);
+  background: rgba(54, 37, 16, 0.45);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.api-key-panel label {
+  display: block;
+  color: #f7dcad;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.api-key-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.api-key-row input {
+  flex: 1;
+  min-width: 240px;
+  border-radius: 8px;
+  border: 1px solid rgba(206, 168, 105, 0.45);
+  background: rgba(20, 17, 12, 0.9);
+  color: #fff5df;
+  padding: 0.55rem 0.65rem;
+}
+
 /* PINT DASH BAR SCENE (TABLE NAVIGATION) */
 .irish-bar-scene {
   position: relative;
