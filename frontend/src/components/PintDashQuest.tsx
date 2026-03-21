@@ -43,6 +43,20 @@ const TABLES: TableLayout[] = [
 ];
 
 const SPRITE_SOURCES = ['/irish-girl.gif', '/irish-girl.png', '/irish-girl.webp'];
+const USER_OPENAI_KEY_STORAGE_KEY = 'craicathon.user_openai_key.v1';
+
+function buildOpenAIHeaders(): HeadersInit {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+
+  const storedKey = localStorage.getItem(USER_OPENAI_KEY_STORAGE_KEY)?.trim();
+  if (storedKey) {
+    headers['x-openai-api-key'] = storedKey;
+  }
+
+  return headers;
+}
 
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items];
@@ -53,7 +67,7 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-function speakIrish(text: string) {
+function speakIrishFallback(text: string) {
   if (!('speechSynthesis' in window)) {
     return;
   }
@@ -63,6 +77,28 @@ function speakIrish(text: string) {
   utterance.rate = 0.96;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
+}
+
+async function speakIrish(text: string): Promise<void> {
+  try {
+    const response = await fetch('/api/speak', {
+      method: 'POST',
+      headers: buildOpenAIHeaders(),
+      body: JSON.stringify({ text })
+    });
+
+    const payload = (await response.json()) as { audioBase64?: string; audioMimeType?: string; error?: string };
+
+    if (!response.ok || !payload.audioBase64) {
+      throw new Error(payload.error || 'Speech request failed.');
+    }
+
+    const audio = new Audio(`data:${payload.audioMimeType || 'audio/mpeg'};base64,${payload.audioBase64}`);
+    await audio.play();
+  } catch (error) {
+    console.error('OpenAI speech failed, using browser voice fallback:', error);
+    speakIrishFallback(text);
+  }
 }
 
 function buildOptions(prompt: Prompt): string[] {
@@ -304,7 +340,7 @@ export default function PintDashQuest() {
                   </button>
                 ))}
               </div>
-              <button className="hear-reply" onClick={() => speakIrish(selectedOrder.prompt.barmaidReply)}>
+              <button className="hear-reply" onClick={() => void speakIrish(selectedOrder.prompt.barmaidReply)}>
                 Hear Correct Reply
               </button>
             </div>

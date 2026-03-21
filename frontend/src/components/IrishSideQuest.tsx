@@ -68,6 +68,20 @@ type ConversationFlashcard = {
 };
 const USER_ID_KEY = 'sidequest_user_id';
 const VOICE_RECORDINGS_KEY = 'sidequest_voice_recordings';
+const USER_OPENAI_KEY_STORAGE_KEY = 'craicathon.user_openai_key.v1';
+
+function buildOpenAIHeaders(): HeadersInit {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+
+  const storedKey = localStorage.getItem(USER_OPENAI_KEY_STORAGE_KEY)?.trim();
+  if (storedKey) {
+    headers['x-openai-api-key'] = storedKey;
+  }
+
+  return headers;
+}
 
 function readSet(key: string): Set<string> {
   const raw = localStorage.getItem(key);
@@ -92,11 +106,9 @@ function normalizeCardText(value: unknown): string {
 }
 
 async function fetchPhoneticPronunciation(phrase: string): Promise<string> {
-  const response = await fetch('http://localhost:3001/api/pronunciation', {
+  const response = await fetch('/api/pronunciation', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: buildOpenAIHeaders(),
     body: JSON.stringify({ text: phrase })
   });
   const payload = (await response.json()) as { pronunciation?: string; error?: string };
@@ -218,7 +230,7 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-function speakIrish(text: string) {
+function speakIrishFallback(text: string) {
   if (!('speechSynthesis' in window)) {
     return;
   }
@@ -228,6 +240,28 @@ function speakIrish(text: string) {
   utterance.rate = 0.95;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
+}
+
+async function speakIrish(text: string): Promise<void> {
+  try {
+    const response = await fetch('/api/speak', {
+      method: 'POST',
+      headers: buildOpenAIHeaders(),
+      body: JSON.stringify({ text })
+    });
+
+    const payload = (await response.json()) as { audioBase64?: string; audioMimeType?: string; error?: string };
+
+    if (!response.ok || !payload.audioBase64) {
+      throw new Error(payload.error || 'Speech request failed.');
+    }
+
+    const audio = new Audio(`data:${payload.audioMimeType || 'audio/mpeg'};base64,${payload.audioBase64}`);
+    await audio.play();
+  } catch (error) {
+    console.error('OpenAI speech failed, using browser voice fallback:', error);
+    speakIrishFallback(text);
+  }
 }
 
 function normalizeCard(raw: RawSlangCard): SlangCard {
@@ -748,7 +782,7 @@ export default function IrishSideQuest() {
               )}
 
               <div className="card-actions">
-                <button onClick={() => speakIrish(dailyCard.phrase)}>🔊 Hear Phrase</button>
+                <button onClick={() => void speakIrish(dailyCard.phrase)}>🔊 Hear Phrase</button>
                 <button
                   onClick={() => {
                     if (recordingCardId === dailyCard.id && isRecording) {
@@ -858,7 +892,7 @@ export default function IrishSideQuest() {
                 )}
 
                 <div className="card-actions">
-                  <button onClick={() => speakIrish(card.phrase)}>🔊 Hear</button>
+                  <button onClick={() => void speakIrish(card.phrase)}>🔊 Hear</button>
                   <button
                     onClick={() => {
                       if (recordingCardId === card.id && isRecording) {
@@ -936,7 +970,7 @@ export default function IrishSideQuest() {
                   <p className="culture-note"><strong>📖 {card.cultureNote}</strong></p>
                   {card.historyNote && <p className="history"><strong>History:</strong> {card.historyNote}</p>}
                   <div className="card-actions">
-                    <button onClick={() => speakIrish(card.phrase)}>🔊 Hear</button>
+                    <button onClick={() => void speakIrish(card.phrase)}>🔊 Hear</button>
                     <button onClick={() => toggleFavorite(card.id)}>{favorites.has(card.id) ? '❤️ Saved' : '🤍 Save'}</button>
                     <button onClick={() => toggleLearned(card.id)}>{learned.has(card.id) ? '↩️ Unlearn' : '📝 Mark Learned'}</button>
                   </div>

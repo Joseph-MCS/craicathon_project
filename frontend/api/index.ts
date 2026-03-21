@@ -540,5 +540,36 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
   }
 
+  if (path === '/api/speak' && method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const text = typeof body.text === 'string' ? body.text.trim() : '';
+      const apiKey = resolveOpenAIKey(req);
+
+      if (!text) {
+        json(res, 400, { error: 'Text is required.' });
+        return;
+      }
+
+      if (text.length > 600) {
+        json(res, 400, { error: 'Text is too long.' });
+        return;
+      }
+
+      ensureConfigured(apiKey);
+      const speech = await synthesizeIrishReply(text, apiKey);
+
+      json(res, 200, {
+        ...speech,
+        voiceDisclosure: VOICE_DISCLOSURE
+      });
+      return;
+    } catch (error) {
+      console.error('Speech synthesis failed:', error);
+      json(res, 500, { error: getErrorMessage(error) });
+      return;
+    }
+  }
+
   json(res, 404, { error: 'Not found.' });
 }
