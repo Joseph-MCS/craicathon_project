@@ -282,24 +282,49 @@ export default function IrishSideQuest() {
     });
   }
 
+  function updateLeaderboardScore(cardsLearnedCount: number) {
+    axios.post('http://localhost:3001/api/sidequest/leaderboard', {
+      userId,
+      cardsLearned: cardsLearnedCount,
+      score: quizScore || 0
+    }).catch(err => console.error('Failed to update leaderboard:', err));
+  }
+
   function markLearned(cardId: string) {
     setLearned(prev => {
+      if (prev.has(cardId)) {
+        return prev;
+      }
+
       const next = new Set(prev);
       next.add(cardId);
       writeSet(LEARNED_KEY, next);
+      updateLeaderboardScore(next.size);
       return next;
     });
-
-    // Update leaderboard
-    updateLeaderboardScore();
   }
 
-  function updateLeaderboardScore() {
-    axios.post('http://localhost:3001/api/sidequest/leaderboard', {
-      userId,
-      cardsLearned: learned.size + 1,
-      score: quizScore || 0
-    }).catch(err => console.error('Failed to update leaderboard:', err));
+  function unlearnCard(cardId: string) {
+    setLearned(prev => {
+      if (!prev.has(cardId)) {
+        return prev;
+      }
+
+      const next = new Set(prev);
+      next.delete(cardId);
+      writeSet(LEARNED_KEY, next);
+      updateLeaderboardScore(next.size);
+      return next;
+    });
+  }
+
+  function toggleLearned(cardId: string) {
+    if (learned.has(cardId)) {
+      unlearnCard(cardId);
+      return;
+    }
+
+    markLearned(cardId);
   }
 
   function unlockRandomCard() {
@@ -557,7 +582,7 @@ export default function IrishSideQuest() {
                   <button onClick={() => playUserRecording(dailyCard.id)}>▶️ Playback</button>
                 )}
                 <button onClick={() => toggleFavorite(dailyCard.id)}>{favorites.has(dailyCard.id) ? '❤️ Saved' : '🤍 Save'}</button>
-                <button onClick={() => markLearned(dailyCard.id)}>{learned.has(dailyCard.id) ? '✅ Learned' : '📝 Mark learned'}</button>
+                <button onClick={() => toggleLearned(dailyCard.id)}>{learned.has(dailyCard.id) ? '↩️ Unlearn' : '📝 Mark learned'}</button>
               </div>
             </article>
           )}
@@ -667,7 +692,7 @@ export default function IrishSideQuest() {
                     <button onClick={() => playUserRecording(card.id)} title="Play your recording">▶️</button>
                   )}
                   <button onClick={() => toggleFavorite(card.id)}>{favorites.has(card.id) ? '❤️' : '🤍'}</button>
-                  <button onClick={() => markLearned(card.id)}>{learned.has(card.id) ? '✅' : '📝'}</button>
+                  <button onClick={() => toggleLearned(card.id)}>{learned.has(card.id) ? '↩️' : '📝'}</button>
                 </div>
               </article>
             ))}
@@ -730,7 +755,7 @@ export default function IrishSideQuest() {
                   <div className="card-actions">
                     <button onClick={() => speakIrish(card.phrase)}>🔊 Hear</button>
                     <button onClick={() => toggleFavorite(card.id)}>{favorites.has(card.id) ? '❤️ Saved' : '🤍 Save'}</button>
-                    <button onClick={() => markLearned(card.id)}>{learned.has(card.id) ? '✅ Learned' : '📝 Mark Learned'}</button>
+                    <button onClick={() => toggleLearned(card.id)}>{learned.has(card.id) ? '↩️ Unlearn' : '📝 Mark Learned'}</button>
                   </div>
                 </article>
               ))}
