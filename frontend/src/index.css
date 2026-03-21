@@ -124,15 +124,17 @@ button {
   gap: 24px;
   padding: 28px;
   border-radius: 28px;
+  color: #172d27;
+  border-color: rgba(17, 44, 38, 0.18);
   background:
-    linear-gradient(120deg, rgba(255, 248, 232, 0.95), rgba(240, 232, 210, 0.9)),
+    linear-gradient(120deg, rgba(255, 250, 237, 0.98), rgba(243, 236, 216, 0.94)),
     linear-gradient(160deg, rgba(219, 135, 67, 0.08), transparent 60%);
   animation: rise-in 0.6s ease-out;
 }
 
 .eyebrow {
   margin: 0 0 10px;
-  color: var(--accent-deep);
+  color: #315b50;
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -151,13 +153,44 @@ button {
   font-size: clamp(2.4rem, 4vw, 4.6rem);
   line-height: 0.95;
   letter-spacing: -0.03em;
+  color: #132f28;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .lede {
   max-width: 720px;
   margin: 16px 0 0;
-  color: var(--ink-soft);
+  color: #35514a;
   font-size: 1.06rem;
+}
+
+.panel-tabs {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(156, 193, 181, 0.3);
+  background: rgba(9, 20, 32, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.tab-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8f4ee;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.tab-button.is-active {
+  background: linear-gradient(135deg, rgba(252, 232, 189, 0.97), rgba(232, 188, 124, 0.95));
+  border-color: rgba(255, 233, 196, 0.9);
+  color: #2f3d30;
+  box-shadow: 0 8px 18px rgba(17, 34, 31, 0.25);
 }
 
 .signal-row {
@@ -215,7 +248,9 @@ button {
   min-height: 700px;
   border-radius: 28px;
   padding: 24px;
-  background: linear-gradient(180deg, rgba(250, 244, 229, 0.94), rgba(238, 233, 215, 0.92));
+  color: #1a2e28;
+  border-color: rgba(17, 44, 38, 0.16);
+  background: linear-gradient(180deg, rgba(252, 247, 234, 0.97), rgba(240, 234, 217, 0.94));
   animation: rise-in 0.75s ease-out;
 }
 
@@ -233,7 +268,11 @@ button {
 
 .chat-header p {
   margin: 8px 0 0;
-  color: var(--ink-soft);
+  color: #415a54;
+}
+
+.chat-header h2 {
+  color: #19362f;
 }
 
 .chat-scroll {
@@ -243,6 +282,8 @@ button {
   gap: 14px;
   padding: 8px 2px 12px;
   overflow-y: auto;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 252, 242, 0.35));
 }
 
 .empty-state {
@@ -274,7 +315,8 @@ button {
 
 .message-card.assistant {
   align-self: flex-start;
-  background: rgba(255, 255, 255, 0.72);
+  color: #1d2f2a;
+  background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(25, 53, 47, 0.08);
   border-bottom-left-radius: 8px;
 }
@@ -351,13 +393,14 @@ button {
   min-height: 42px;
   padding: 0 16px;
   border-radius: 999px;
-  background: rgba(25, 53, 47, 0.08);
-  color: var(--ink);
+  border: 1px solid rgba(32, 71, 61, 0.2);
+  background: rgba(25, 53, 47, 0.12);
+  color: #203e37;
   font-weight: 700;
 }
 
 .text-label {
-  color: var(--ink-soft);
+  color: #3f5852;
   font-size: 0.92rem;
   font-weight: 700;
 }
@@ -394,8 +437,40 @@ button {
 
 .hint {
   margin: 0;
-  color: var(--ink-soft);
+  color: #405954;
   font-size: 0.92rem;
+}
+
+.selection-panel {
+  border: 1px solid rgba(40, 77, 67, 0.18);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.selection-status {
+  margin: 0 0 10px;
+  color: #35514a;
+  font-weight: 600;
+}
+
+.selection-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.selection-phrase {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 69, 60, 0.16);
+  background: rgba(252, 247, 236, 0.9);
+  color: #243d36;
+  font-weight: 600;
 }
 
 .side-panel {
@@ -1562,15 +1637,15 @@ button.recording {
 
 .api-key-panel {
   margin-top: 0.9rem;
-  border: 1px solid rgba(220, 173, 80, 0.35);
-  background: rgba(54, 37, 16, 0.45);
+  border: 1px solid rgba(173, 130, 47, 0.35);
+  background: linear-gradient(180deg, rgba(255, 243, 216, 0.88), rgba(249, 233, 199, 0.8));
   border-radius: 10px;
   padding: 0.75rem;
 }
 
 .api-key-panel label {
   display: block;
-  color: #f7dcad;
+  color: #6f4d20;
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
@@ -1585,9 +1660,9 @@ button.recording {
   flex: 1;
   min-width: 240px;
   border-radius: 8px;
-  border: 1px solid rgba(206, 168, 105, 0.45);
-  background: rgba(20, 17, 12, 0.9);
-  color: #fff5df;
+  border: 1px solid rgba(176, 131, 69, 0.5);
+  background: rgba(255, 251, 243, 0.98);
+  color: #3d2a11;
   padding: 0.55rem 0.65rem;
 }
 

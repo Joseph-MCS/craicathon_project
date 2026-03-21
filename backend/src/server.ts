@@ -20,6 +20,7 @@ const TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
 const TTS_VOICE = process.env.OPENAI_TTS_VOICE || 'coral';
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const VOICE_DISCLOSURE = 'The spoken reply uses an AI-generated voice.';
+const sideQuestLeaderboard: Array<{ userId: string; cardsLearned: number; score: number; timestamp: number }> = [];
 const IRISH_TUTOR_INSTRUCTIONS = [
   'You are a warm Irish-language conversation partner for learners.',
   'Always reply entirely in Irish.',
@@ -910,12 +911,8 @@ app.post('/api/sidequest/leaderboard', (req, res) => {
     return res.status(400).json({ error: 'userId, cardsLearned, and score are required.' });
   }
 
-  // For hackathon demo: store in memory (in production, use a database)
-  const leaderboardKey = 'sidequest_leaderboard';
-  const raw = localStorage.getItem(leaderboardKey) || '[]';
-
   try {
-    let entries = JSON.parse(raw) as Array<{ userId: string; cardsLearned: number; score: number; timestamp: number }>;
+    let entries = [...sideQuestLeaderboard];
 
     // Remove or update existing entry for this userId
     entries = entries.filter(e => e.userId !== userId);
@@ -929,7 +926,8 @@ app.post('/api/sidequest/leaderboard', (req, res) => {
       return b.score - a.score;
     });
 
-    localStorage.setItem(leaderboardKey, JSON.stringify(entries.slice(0, 50))); // Keep top 50
+    sideQuestLeaderboard.length = 0;
+    sideQuestLeaderboard.push(...entries.slice(0, 50));
 
     return res.json({ success: true, leaderboard: entries.slice(0, 10) });
   } catch {
@@ -938,17 +936,13 @@ app.post('/api/sidequest/leaderboard', (req, res) => {
 });
 
 app.get('/api/sidequest/leaderboard', (_req, res) => {
-  const leaderboardKey = 'sidequest_leaderboard';
-  const raw = localStorage.getItem(leaderboardKey) || '[]';
-
-  try {
-    const entries = JSON.parse(raw) as Array<{ userId: string; cardsLearned: number; score: number; timestamp: number }>;
-    return res.json({ leaderboard: entries.slice(0, 10) });
-  } catch {
-    return res.json({ leaderboard: [] });
-  }
+  return res.json({ leaderboard: sideQuestLeaderboard.slice(0, 10) });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
