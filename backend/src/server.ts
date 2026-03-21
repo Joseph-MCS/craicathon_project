@@ -216,7 +216,7 @@ async function generateIrishReply(message: string, history: ClientMessage[]): Pr
       content: [
         {
           text: item.text,
-          type: 'input_text'
+          type: item.role === 'assistant' ? 'output_text' : 'input_text'
         }
       ],
       role: item.role
