@@ -1,54 +1,73 @@
-# Craicathon 2026 - Irish Language Learning App
+# Craicathon 2026 - Irish Voice Chat
 
-## Project Status: Configuration Complete
-
-All necessary configuration files have been created. You just need to install dependencies and start the servers.
+A small full-stack app for speaking Irish into your browser, transcribing it with OpenAI, showing the transcript in chat, generating a reply in Irish, and speaking that reply back with OpenAI text-to-speech.
 
 ## Prerequisites
 
-- Node.js (v18+)
+- Node.js 18+
 - npm
+- `OPENAI_API_KEY` in a repo-root `.env`
 
-## Quick Start
+## Environment
 
-### 1. Install Backend Dependencies
+Create `.env` in the project root:
+
 ```bash
-cd backend
+OPENAI_API_KEY=your_key_here
+PORT=3001
+OPENAI_CHAT_MODEL=gpt-5-mini
+OPENAI_TRANSCRIPTION_MODEL=gpt-4o-transcribe
+OPENAI_TTS_MODEL=gpt-4o-mini-tts
+OPENAI_TTS_VOICE=coral
+```
+
+You can also copy from `.env.example`.
+
+## Development
+
+Install dependencies once from the repo root:
+
+```bash
 npm install
 ```
 
-### 2. Start Backend Server
+Run backend and frontend together:
+
 ```bash
 npm run dev
-# Server runs on http://localhost:3001
 ```
 
-### 3. Install Frontend Dependencies
-Open a new terminal:
+Open:
+
 ```bash
-cd frontend
-npm install
+http://localhost:5173
 ```
 
-### 4. Start Frontend Application
+## Local Deployment
+
+Build the frontend and backend:
+
 ```bash
-npm run dev
-# App runs on http://localhost:5173
+npm run build
 ```
 
-## Troubleshooting
+Start the production server:
 
-If you see errors like "Cannot find module", ensure you have run `npm install` in both directories.
+```bash
+npm start
+```
 
-## Features Implemented
+Open:
 
-*   **Speech-to-Text**: Uses Web Speech API (`ga-IE` locale).
-*   **Text-to-Speech**: Mock integration for ABAIR API.
-*   **Grammar Check**: Mock integration for Gaelspell.
-*   **Conversation**: Simple request/response loop.
+```bash
+http://localhost:3001
+```
 
-## Next Steps
+The backend serves the built frontend automatically when `frontend/dist` exists.
 
-1. Get API keys for ABAIR and Gaelspell.
-2. Connect OpenAI/Anthropic API for real intelligence.
-3. Improve UI with CSS/Styled Components.
+## Notes
+
+- The browser app uses the microphone through `MediaRecorder`, so mic permission is required.
+- Keep recordings short for the best local experience.
+- The spoken reply is AI-generated and should be disclosed as such to end users.
+- Irish quality should be treated as something to validate with real usage and sample audio.
