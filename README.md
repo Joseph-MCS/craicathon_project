@@ -2,6 +2,8 @@
 
 Interactive full-stack app for learning Irish through conversation, voice, and game-style side quests.
 
+https://frontend-chi-blush-rcn4b04i3b.vercel.app/
+
 Current major experiences:
 
 - Core Learning: Irish chat with voice input/output (OpenAI-backed)
