@@ -318,13 +318,15 @@ export default function IrishSideQuest() {
   // Fetch cards and seasonal cards
   useEffect(() => {
     const load = async () => {
-      const [dailyRes, cardsRes] = await Promise.all([
+      const [dailyRes, cardsRes, seasonalRes] = await Promise.all([
         axios.get('http://localhost:3001/api/sidequest/daily'),
-        axios.get('http://localhost:3001/api/sidequest/cards')
+        axios.get('http://localhost:3001/api/sidequest/cards'),
+        axios.get('http://localhost:3001/api/sidequest/seasonal')
       ]);
 
       const fetchedDaily = normalizeCard(dailyRes.data.card as RawSlangCard);
       const fetchedCards = (cardsRes.data.cards as RawSlangCard[]).map(normalizeCard);
+      const fetchedSeasonal = (seasonalRes.data.seasonal as RawSlangCard[]).map(normalizeCard);
       const conversationCards = loadConversationFlashcards();
       const conversationIds = conversationCards.map((card) => card.id);
       const mergedCards = [...fetchedCards];
@@ -371,6 +373,7 @@ export default function IrishSideQuest() {
 
       setDailyCard(fetchedDaily);
       setCards(mergedCards);
+  setSeasonalCards(fetchedSeasonal);
 
       setUnlocked(prev => {
         const next = new Set(prev);
