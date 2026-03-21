@@ -46,7 +46,7 @@ const RECORDER_MIME_TYPES = [
   'audio/mp4',
   'audio/ogg;codecs=opus'
 ];
-const WELCOME_COPY = 'Dia duit. Labhair liom as Gaeilge agus freagróidh mé leat i nGaeilge, le guth AI.';
+const WELCOME_COPY = 'Dia duit. Labhair liom as Gaeilge agus freagróidh mé duit i nGaeilge, le guth AI.';
 
 function createMessage(role: ChatRole, text: string, mode: InputMode): Message {
   return {
@@ -101,7 +101,7 @@ export default function ConversationInterface() {
   const [isRecording, setIsRecording] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [statusText, setStatusText] = useState('Tap the mic, speak Irish, and I will answer out loud.');
+  const [statusText, setStatusText] = useState('Tapáil an mic, labhair i nGaeilge, agus freagróidh mé os ard.');
   const [errorText, setErrorText] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [canRecord, setCanRecord] = useState(false);
@@ -377,23 +377,24 @@ export default function ConversationInterface() {
     void sendTextMessage(inputText);
   }
 
-  const readyLabel = isRecording ? 'Recording' : isBusy ? 'Working' : isSpeaking ? 'Speaking' : 'Ready';
+  const readyLabel = isRecording ? 'Ag Éisteacht' : isBusy ? 'Ag Obair' : isSpeaking ? 'Ag Labhairt' : 'Réidh';
 
   return (
     <main className="shell">
       <section className="hero-card">
         <div>
-          <p className="eyebrow">Irish voice companion</p>
-          <h1>An Chomhrá Beo</h1>
+          <p className="eyebrow">Comrádaí gutha Gaeilge</p>
+          <h1>Labhair Linn</h1>
           <p className="lede">
-            Speak Irish into your microphone. The app transcribes it, drops the transcript into the chat, writes back in
-            Irish, and answers you out loud.
+            Labhair isteach sa mhicreafón. Déanann an aip tras-scríobh ar do
+            chuid Gaeilge, cuireann sí isteach sa chomhrá í, scríobhann sí
+            freagra i nGaeilge, agus labhraíonn sí leat ar ais.
           </p>
         </div>
 
         <div className="signal-row">
           <span className={`pill ${health?.configured ? 'pill-ready' : 'pill-warn'}`}>
-            {health?.configured ? 'Backend ready' : 'Backend not configured'}
+            {health?.configured ? 'Freastalaí réidh' : 'Gan socrú fós'}
           </span>
           <span className={`pill ${isRecording ? 'pill-recording' : 'pill-calm'}`}>{readyLabel}</span>
         </div>
@@ -403,11 +404,11 @@ export default function ConversationInterface() {
         <section className="chat-panel">
           <div className="chat-header">
             <div>
-              <h2>Conversation</h2>
+              <h2>Comhrá</h2>
               <p>{statusText}</p>
             </div>
             <button className="secondary-button" onClick={() => void replayLastAudio()} disabled={!lastAudio || isBusy}>
-              Replay last reply
+              Seinn arís
             </button>
           </div>
 
@@ -415,12 +416,12 @@ export default function ConversationInterface() {
             {messages.length === 0 ? (
               <div className="empty-state">
                 <p>{WELCOME_COPY}</p>
-                <p>Best results come from short Irish clips and clear pronunciation.</p>
+                <p>Is fearr a oibríonn sé le gearrthóga gearra agus fuaimniú soiléir.</p>
               </div>
             ) : (
               messages.map((message) => (
                 <article key={message.id} className={`message-card ${message.role}`}>
-                  <span className="message-meta">{message.mode === 'voice' ? 'Voice transcript' : 'Typed line'}</span>
+                  <span className="message-meta">{message.mode === 'voice' ? 'Guth' : 'Clóscríofa'}</span>
                   <p>{message.text}</p>
                 </article>
               ))
@@ -436,18 +437,18 @@ export default function ConversationInterface() {
                 onClick={() => void (isRecording ? stopRecording() : startRecording())}
                 type="button"
               >
-                {isRecording ? 'Stop recording' : 'Speak Irish'}
+                {isRecording ? 'Stad' : 'Labhair anois'}
               </button>
               <p className="hint">
                 {canRecord
-                  ? 'Record a short Irish line, then wait for the transcript and spoken reply.'
-                  : 'This browser does not support the recording flow used by the app.'}
+                  ? 'Taifead abairt ghearr i nGaeilge, agus fan leis an tras-scríbhinn agus leis an bhfreagra labhartha.'
+                  : 'Ní thacaíonn an brabhsálaí seo leis an sreabhadh taifeadta a úsáideann an aip.'}
               </p>
             </div>
 
             <form className="text-form" onSubmit={handleTextSubmit}>
               <label className="text-label" htmlFor="irish-text">
-                Or type your Irish
+                Nó scríobh i nGaeilge
               </label>
               <div className="text-row">
                 <input
@@ -459,7 +460,7 @@ export default function ConversationInterface() {
                   value={inputText}
                 />
                 <button className="send-button" disabled={!inputText.trim() || isBusy || !health?.configured} type="submit">
-                  Send
+                  Seol
                 </button>
               </div>
             </form>
@@ -468,39 +469,39 @@ export default function ConversationInterface() {
 
         <aside className="side-panel">
           <section className="info-card">
-            <h3>System</h3>
+            <h3>Córas</h3>
             <dl className="stack-list">
               <div>
-                <dt>Transcription</dt>
-                <dd>{health?.models.transcription ?? 'Checking...'}</dd>
+                <dt>Tras-scríobh</dt>
+                <dd>{health?.models.transcription ?? 'Ag seiceáil...'}</dd>
               </div>
               <div>
-                <dt>Chat</dt>
-                <dd>{health?.models.chat ?? 'Checking...'}</dd>
+                <dt>Comhrá</dt>
+                <dd>{health?.models.chat ?? 'Ag seiceáil...'}</dd>
               </div>
               <div>
-                <dt>Speech</dt>
+                <dt>Guth</dt>
                 <dd>
-                  {health?.models.ttsProvider ?? health?.models.tts ?? 'Checking...'} / {health?.models.voice ?? '...'}
+                  {health?.models.ttsProvider ?? health?.models.tts ?? 'Ag seiceáil...'} / {health?.models.voice ?? '...'}
                 </dd>
               </div>
             </dl>
           </section>
 
           <section className="info-card">
-            <h3>What to expect</h3>
-            <p>Irish is best-effort here, so it is worth testing with short clips first and checking the transcript carefully.</p>
-            <p>Typed messages also come back with spoken replies, which helps when you want to retry a phrase without recording again.</p>
+            <h3>Cad a tharlóidh</h3>
+            <p>Is fiú gearrthóga gearra a thriail ar dtús agus an tras-scríbhinn a sheiceáil go cúramach.</p>
+            <p>Tagann freagra labhartha ar ais ar theachtaireachtaí clóscríofa freisin, rud a chabhraíonn nuair is mian leat frása a thriail arís.</p>
           </section>
 
           <section className="info-card">
-            <h3>Disclosure</h3>
+            <h3>Fógra</h3>
             <p>{health?.voiceDisclosure ?? 'The spoken reply uses an AI-generated voice.'}</p>
           </section>
 
           {errorText ? (
             <section className="info-card error-card">
-              <h3>Issue</h3>
+              <h3>Fadhb</h3>
               <p>{errorText}</p>
             </section>
           ) : null}

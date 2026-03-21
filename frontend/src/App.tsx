@@ -18,27 +18,30 @@ function App() {
       <div className="App">
         <section className="landing-page">
           <div className="landing-aura" aria-hidden="true" />
-          <p className="landing-kicker">Failte go Craicathon</p>
-          <h1>Craicathon Language Hub</h1>
+          <p className="landing-kicker">Fáilte go Craicathon</p>
+          <h1>Labhair Linn</h1>
           <p className="landing-copy">
-            One journey, two paths. Enter the core conversation flow or branch
-            into the Irish Side Quest for slang, stories, and culture.
+            Cleacht do chuid Gaeilge i spás glan, geal, agus lán de chraic.
+            Téigh isteach sa chomhrá beo, nó bog isteach sna cluichí taobh le
+            frásaí, cultúr, agus scéalta beaga.
           </p>
 
           <div className="landing-tags" aria-hidden="true">
-            <span>Comhra</span>
-            <span>Cultur</span>
+            <span>Comhrá</span>
+            <span>Guth</span>
+            <span>Focail</span>
+            <span>Cultúr</span>
             <span>Craic</span>
           </div>
 
           <div className="landing-actions">
             <button className="nav-card" onClick={() => setView('core')}>
-              <strong>Go to Core Learning</strong>
-              <span>Main chat and feedback loop</span>
+              <strong>Comhrá Beo</strong>
+              <span>Mic, tras-scríobh, freagra, agus guth ar ais</span>
             </button>
             <button className="nav-card" onClick={() => setView('quests-hub')}>
-              <strong>Go to Quest Realm</strong>
-              <span>All side quests in one place</span>
+              <strong>Eachtraí Gaeilge</strong>
+              <span>Cártaí, cultúr, agus cluichí beaga in aon áit amháin</span>
             </button>
           </div>
         </section>
@@ -50,27 +53,27 @@ function App() {
     return (
       <div className="App">
         <div className="mode-switch single-back">
-          <button onClick={() => setView('landing')}>Back to Landing</button>
+          <button onClick={() => setView('landing')}>Ar ais abhaile</button>
         </div>
 
         <section className="quests-hub">
-          <h1>Quest Realm</h1>
-          <p>Pick a side quest and jump in.</p>
+          <h1>Eachtraí Gaeilge</h1>
+          <p>Pioc cluiche agus lean ort ag foghlaim.</p>
 
           <div className="quests-grid">
             <button className="quest-button" onClick={() => setView('quest-cards')}>
-              <strong>Slang and Culture Cards</strong>
-              <span>Collect cards, unlock notes, and run mini quizzes.</span>
+              <strong>Cártaí agus Cultúr</strong>
+              <span>Bailigh cártaí, oscail nótaí, agus déan tráth na gceist beag.</span>
             </button>
 
             <button className="quest-button" onClick={() => setView('quest-phrase-rescue')}>
-              <strong>Phrase Rescue</strong>
-              <span>Repair broken Irish sentences against the clock.</span>
+              <strong>Tarrtháil Frásaí</strong>
+              <span>Deisigh abairtí briste Gaeilge sula ritheann an t-am amach.</span>
             </button>
 
             <button className="quest-button" onClick={() => setView('quest-story-trail')}>
-              <strong>Story Trail</strong>
-              <span>Choose responses and shape a short Irish adventure.</span>
+              <strong>Scéalta Beaga</strong>
+              <span>Roghnaigh freagraí agus múnlaigh eachtra ghearr i nGaeilge.</span>
             </button>
           </div>
         </section>
@@ -82,9 +85,9 @@ function App() {
     <div className="App">
       <div className="mode-switch single-back">
         {view !== 'core' && (
-          <button onClick={() => setView('quests-hub')}>Back to Quest Realm</button>
+          <button onClick={() => setView('quests-hub')}>Ar ais go hEachtraí</button>
         )}
-        <button onClick={() => setView('landing')}>Back to Landing</button>
+        <button onClick={() => setView('landing')}>Ar ais abhaile</button>
       </div>
 
       {view === 'core' && <ConversationInterface />}
@@ -93,20 +96,20 @@ function App() {
 
       {view === 'quest-phrase-rescue' && (
         <section className="quest-placeholder">
-          <h1>Phrase Rescue</h1>
+          <h1>Tarrtháil Frásaí</h1>
           <p>
-            This quest is queued next. You will fix grammar and phrase order in
-            short Irish prompts for points.
+            Tá an cluiche seo ar an mbealach. Beidh tú ag ceartú gramadaí agus
+            ord focal i bhfrásaí gearra Gaeilge chun pointí a bhaint amach.
           </p>
         </section>
       )}
 
       {view === 'quest-story-trail' && (
         <section className="quest-placeholder">
-          <h1>Story Trail</h1>
+          <h1>Scéalta Beaga</h1>
           <p>
-            This quest is queued next. You will choose Irish responses that
-            unlock different story endings.
+            Tá an cluiche seo ar an mbealach. Beidh tú ag roghnú freagraí
+            Gaeilge a osclaíonn críocha éagsúla den scéal.
           </p>
         </section>
       )}
