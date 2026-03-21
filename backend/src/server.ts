@@ -32,6 +32,18 @@ const IRISH_TUTOR_INSTRUCTIONS = [
   'If the learner uses English, ask them in Irish to continue in Irish.',
   'Prefer everyday Irish with correct fada marks.'
 ].join(' ');
+const GLOSS_DIALECTS = ['Ulster', 'Connacht', 'Munster'] as const;
+const MAX_WORD_GLOSS_CACHE_ENTRIES = 250;
+const WORD_GLOSS_INSTRUCTIONS = [
+  'You help an Irish learner understand one hovered Irish word inside a short Irish sentence.',
+  'Return strict JSON only with keys: translation, note, dialects.',
+  'translation should be concise natural English, at most 6 words.',
+  'note should be a short explanation of nuance or grammar, at most 18 words.',
+  'dialects must be an array of exactly 3 objects in this order: Ulster, Connacht, Munster.',
+  'Each dialect object must contain dialect and pronunciation.',
+  'pronunciation must be a learner-friendly respelling in English letters, not IPA.',
+  'Use the sentence context to choose the most likely meaning.'
+].join(' ');
 
 type ClientMessage = {
   mode?: 'text' | 'voice';
@@ -48,6 +60,11 @@ type VoiceChatRequest = {
   audioBase64?: string;
   history?: ClientMessage[];
   mimeType?: string;
+};
+
+type WordGlossRequest = {
+  context?: string;
+  word?: string;
 };
 
 type OpenAIErrorPayload = {
@@ -72,6 +89,15 @@ type OpenAIResponsePayload = OpenAIErrorPayload & {
   output_text?: string;
 };
 
+type ParsedWordGlossPayload = {
+  dialects?: Array<{
+    dialect?: string;
+    pronunciation?: string;
+  }>;
+  note?: string;
+  translation?: string;
+};
+
 type AbairErrorPayload = {
   error?: string;
 };
@@ -93,6 +119,16 @@ type SlangCard = {
     soundLike: string;
     tip: string;
   }>;
+};
+
+type WordGlossResponse = {
+  dialects: Array<{
+    dialect: string;
+    pronunciation: string;
+  }>;
+  note: string;
+  translation: string;
+  word: string;
 };
 
 const sideQuestCards: SlangCard[] = [
@@ -184,6 +220,7 @@ const sideQuestCards: SlangCard[] = [
     ]
   }
 ];
+const wordGlossCache = new Map<string, WordGlossResponse>();
 
 function getDailyCard(cards: SlangCard[]): SlangCard {
   const now = new Date();
@@ -291,6 +328,102 @@ function ensureConfigured() {
   if (!OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is missing. Add it to the repo root .env file and restart the server.');
   }
+}
+
+function sanitizeLookupWord(word: unknown): string {
+  if (typeof word !== 'string') {
+    return '';
+  }
+
+  return word
+    .trim()
+    .replace(/[^\p{L}\p{M}'’\-]/gu, '')
+    .slice(0, 48);
+}
+
+function sanitizeContextSnippet(context: unknown): string {
+  if (typeof context !== 'string') {
+    return '';
+  }
+
+  return context
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 180);
+}
+
+function extractJsonObject(text: string): string {
+  const firstBraceIndex = text.indexOf('{');
+  const lastBraceIndex = text.lastIndexOf('}');
+
+  if (firstBraceIndex === -1 || lastBraceIndex === -1 || lastBraceIndex < firstBraceIndex) {
+    throw new Error('OpenAI returned an invalid word glossary response.');
+  }
+
+  return text.slice(firstBraceIndex, lastBraceIndex + 1);
+}
+
+function normalizeDialectName(dialect: string): string | null {
+  const normalizedDialect = dialect.trim().toLowerCase();
+
+  if (normalizedDialect.includes('ul')) {
+    return 'Ulster';
+  }
+
+  if (normalizedDialect.includes('con')) {
+    return 'Connacht';
+  }
+
+  if (normalizedDialect.includes('mun')) {
+    return 'Munster';
+  }
+
+  return null;
+}
+
+function trimWordGlossCache() {
+  while (wordGlossCache.size > MAX_WORD_GLOSS_CACHE_ENTRIES) {
+    const oldestKey = wordGlossCache.keys().next().value;
+
+    if (!oldestKey) {
+      return;
+    }
+
+    wordGlossCache.delete(oldestKey);
+  }
+}
+
+function parseWordGlossResponse(rawText: string, word: string): WordGlossResponse {
+  const parsedPayload = JSON.parse(extractJsonObject(rawText)) as ParsedWordGlossPayload;
+  const translation = typeof parsedPayload.translation === 'string' ? parsedPayload.translation.trim() : '';
+
+  if (!translation) {
+    throw new Error('OpenAI returned a glossary card without a translation.');
+  }
+
+  const note = typeof parsedPayload.note === 'string' ? parsedPayload.note.trim() : '';
+  const dialectMap = new Map<string, string>();
+
+  for (const dialectEntry of parsedPayload.dialects ?? []) {
+    const normalizedDialect = normalizeDialectName(dialectEntry?.dialect ?? '');
+    const pronunciation = typeof dialectEntry?.pronunciation === 'string' ? dialectEntry.pronunciation.trim() : '';
+
+    if (normalizedDialect && pronunciation) {
+      dialectMap.set(normalizedDialect, pronunciation);
+    }
+  }
+
+  const firstPronunciation = dialectMap.values().next().value ?? '';
+
+  return {
+    dialects: GLOSS_DIALECTS.map((dialect) => ({
+      dialect,
+      pronunciation: dialectMap.get(dialect) || firstPronunciation || 'Fuaimniú le teacht'
+    })),
+    note,
+    translation,
+    word
+  };
 }
 
 async function transcribeIrishAudio(audioBase64: string, mimeType: string): Promise<string> {
@@ -402,6 +535,63 @@ async function generateIrishReply(message: string, history: ClientMessage[]): Pr
   }
 
   return reply;
+}
+
+async function generateWordGloss(word: string, context: string): Promise<WordGlossResponse> {
+  ensureConfigured();
+
+  const cacheKey = `${word.toLocaleLowerCase('ga-IE')}::${context.toLocaleLowerCase('ga-IE')}`;
+  const cachedGloss = wordGlossCache.get(cacheKey);
+
+  if (cachedGloss) {
+    return cachedGloss;
+  }
+
+  const response = await fetch(`${OPENAI_API_BASE}/responses`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      instructions: WORD_GLOSS_INSTRUCTIONS,
+      max_output_tokens: 220,
+      model: CHAT_MODEL,
+      reasoning: {
+        effort: 'minimal'
+      },
+      input: [
+        {
+          content: [
+            {
+              text: [`Word: ${word}`, `Context sentence: ${context || '(not provided)'}`].join('\n'),
+              type: 'input_text'
+            }
+          ],
+          role: 'user'
+        }
+      ]
+    })
+  });
+
+  const payload = (await response.json()) as OpenAIResponsePayload;
+
+  if (!response.ok) {
+    throw new Error(extractOpenAIError(payload));
+  }
+
+  const rawText = readResponseText(payload);
+
+  if (!rawText) {
+    throw new Error('OpenAI returned an empty glossary response.');
+  }
+
+  const wordGloss = parseWordGlossResponse(rawText, word);
+
+  wordGlossCache.set(cacheKey, wordGloss);
+  trimWordGlossCache();
+
+  return wordGloss;
 }
 
 async function synthesizeOpenAIReply(text: string): Promise<{ audioBase64: string; audioMimeType: string }> {
@@ -544,6 +734,24 @@ app.post('/api/voice-chat', async (req, res) => {
     });
   } catch (error) {
     console.error('Voice pipeline failed:', error);
+    return res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/word-gloss', async (req, res) => {
+  const { context, word } = req.body as WordGlossRequest;
+  const lookupWord = sanitizeLookupWord(word);
+  const safeContext = sanitizeContextSnippet(context);
+
+  if (!lookupWord) {
+    return res.status(400).json({ error: 'A word is required.' });
+  }
+
+  try {
+    const gloss = await generateWordGloss(lookupWord, safeContext);
+    return res.json(gloss);
+  } catch (error) {
+    console.error('Word gloss failed:', error);
     return res.status(500).json({ error: getErrorMessage(error) });
   }
 });

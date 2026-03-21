@@ -36,6 +36,35 @@ type VoiceChatResponse = {
   transcript: string;
 };
 
+type WordGloss = {
+  word: string;
+  translation: string;
+  note: string;
+  dialects: Array<{
+    dialect: string;
+    pronunciation: string;
+  }>;
+};
+
+type WordGlossCacheEntry =
+  | {
+      status: 'loading';
+    }
+  | {
+      status: 'ready';
+      data: WordGloss;
+    }
+  | {
+      status: 'error';
+      error: string;
+    };
+
+type ActiveGloss = {
+  cacheKey: string;
+  messageId: string;
+  tokenIndex: number;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 const RECORDER_MIME_TYPES = [
   'audio/webm;codecs=opus',
@@ -43,6 +72,8 @@ const RECORDER_MIME_TYPES = [
   'audio/mp4',
   'audio/ogg;codecs=opus'
 ];
+const MESSAGE_TOKEN_REGEX = /[\p{L}\p{M}]+(?:['’\-][\p{L}\p{M}]+)*|\s+|[^\s\p{L}\p{M}]+/gu;
+const IRISH_WORD_REGEX = /^[\p{L}\p{M}]+(?:['’\-][\p{L}\p{M}]+)*$/u;
 const WELCOME_COPY = 'Dia duit. Labhair liom as Gaeilge agus freagróidh mé duit i nGaeilge, le guth AI.';
 
 function createMessage(role: ChatRole, text: string, mode: InputMode): Message {
@@ -92,6 +123,18 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+function tokenizeMessageText(text: string): string[] {
+  return text.match(MESSAGE_TOKEN_REGEX) ?? [text];
+}
+
+function isGlossableWord(token: string): boolean {
+  return IRISH_WORD_REGEX.test(token);
+}
+
+function buildGlossCacheKey(word: string, context: string): string {
+  return `${word.trim().toLocaleLowerCase('ga-IE')}::${context.trim().toLocaleLowerCase('ga-IE')}`;
+}
+
 export default function ConversationInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -101,12 +144,15 @@ export default function ConversationInterface() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [canRecord, setCanRecord] = useState(false);
   const [lastAudio, setLastAudio] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [glossCache, setGlossCache] = useState<Record<string, WordGlossCacheEntry>>({});
+  const [activeGloss, setActiveGloss] = useState<ActiveGloss | null>(null);
   const messagesRef = useRef<Message[]>([]);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const glossHoverTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -128,6 +174,8 @@ export default function ConversationInterface() {
     void loadHealth();
 
     return () => {
+      clearGlossHoverTimer();
+
       if (audioRef.current) {
         audioRef.current.pause();
       }
@@ -139,6 +187,13 @@ export default function ConversationInterface() {
   function stopStreamTracks() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+  }
+
+  function clearGlossHoverTimer() {
+    if (glossHoverTimerRef.current !== null && typeof window !== 'undefined') {
+      window.clearTimeout(glossHoverTimerRef.current);
+      glossHoverTimerRef.current = null;
+    }
   }
 
   async function loadHealth() {
@@ -317,6 +372,153 @@ export default function ConversationInterface() {
     await playAudio(lastAudio.base64, lastAudio.mimeType);
   }
 
+  async function loadGloss(word: string, context: string, cacheKey: string) {
+    const existingEntry = glossCache[cacheKey];
+
+    if (existingEntry?.status === 'loading' || existingEntry?.status === 'ready') {
+      return;
+    }
+
+    setGlossCache((currentCache) => ({
+      ...currentCache,
+      [cacheKey]: {
+        status: 'loading'
+      }
+    }));
+
+    try {
+      const response = await fetch(`${API_BASE}/api/word-gloss`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          context,
+          word
+        })
+      });
+      const payload = (await response.json()) as WordGloss | { error?: string };
+
+      if (!response.ok) {
+        throw new Error(typeof payload === 'object' && payload && 'error' in payload ? payload.error : 'Word lookup failed.');
+      }
+
+      setGlossCache((currentCache) => ({
+        ...currentCache,
+        [cacheKey]: {
+          data: payload as WordGloss,
+          status: 'ready'
+        }
+      }));
+    } catch (error) {
+      console.error(error);
+      setGlossCache((currentCache) => ({
+        ...currentCache,
+        [cacheKey]: {
+          error: error instanceof Error ? error.message : 'Word lookup failed.',
+          status: 'error'
+        }
+      }));
+    }
+  }
+
+  function activateGloss(word: string, context: string, messageId: string, tokenIndex: number, immediate = false) {
+    const cacheKey = buildGlossCacheKey(word, context);
+    const showGloss = () => {
+      setActiveGloss({
+        cacheKey,
+        messageId,
+        tokenIndex
+      });
+      void loadGloss(word, context, cacheKey);
+    };
+
+    clearGlossHoverTimer();
+
+    if (immediate || typeof window === 'undefined') {
+      showGloss();
+      return;
+    }
+
+    glossHoverTimerRef.current = window.setTimeout(showGloss, 180);
+  }
+
+  function dismissGloss() {
+    clearGlossHoverTimer();
+    setActiveGloss(null);
+  }
+
+  function renderGlossCard(cacheKey: string, fallbackWord: string) {
+    const glossEntry = glossCache[cacheKey];
+
+    if (!glossEntry || glossEntry.status === 'loading') {
+      return (
+        <div className="gloss-popover" role="status">
+          <p className="gloss-word-heading">{fallbackWord}</p>
+          <p className="gloss-loading">Ag lorg míniúcháin...</p>
+        </div>
+      );
+    }
+
+    if (glossEntry.status === 'error') {
+      return (
+        <div className="gloss-popover" role="status">
+          <p className="gloss-word-heading">{fallbackWord}</p>
+          <p className="gloss-error">{glossEntry.error}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="gloss-popover" role="status">
+        <p className="gloss-word-heading">{glossEntry.data.word}</p>
+        <p className="gloss-translation">{glossEntry.data.translation}</p>
+        <ul className="gloss-dialects">
+          {glossEntry.data.dialects.map((dialect) => (
+            <li key={`${glossEntry.data.word}-${dialect.dialect}`}>
+              <span>{dialect.dialect}</span>
+              <strong>{dialect.pronunciation}</strong>
+            </li>
+          ))}
+        </ul>
+        {glossEntry.data.note ? <p className="gloss-note">{glossEntry.data.note}</p> : null}
+      </div>
+    );
+  }
+
+  function renderMessageText(message: Message) {
+    return tokenizeMessageText(message.text).map((token, tokenIndex) => {
+      if (!isGlossableWord(token)) {
+        return <span key={`${message.id}-token-${tokenIndex}`}>{token}</span>;
+      }
+
+      const cacheKey = buildGlossCacheKey(token, message.text);
+      const isActive = activeGloss?.messageId === message.id && activeGloss.tokenIndex === tokenIndex;
+
+      return (
+        <span
+          key={`${message.id}-token-${tokenIndex}`}
+          className={`gloss-word-wrap ${isActive ? 'is-active' : ''}`}
+          onBlur={dismissGloss}
+          onFocus={() => activateGloss(token, message.text, message.id, tokenIndex, true)}
+          onMouseEnter={() => activateGloss(token, message.text, message.id, tokenIndex)}
+          onMouseLeave={dismissGloss}
+        >
+          <span
+            aria-label={`Show help for ${token}`}
+            className={`gloss-word ${isActive ? 'is-active' : ''}`}
+            onClick={() => activateGloss(token, message.text, message.id, tokenIndex, true)}
+            role="button"
+            tabIndex={0}
+          >
+            {token}
+          </span>
+          {isActive ? renderGlossCard(cacheKey, token) : null}
+        </span>
+      );
+    });
+  }
+
   return (
     <main className="shell">
       <section className="hero-card">
@@ -353,7 +555,7 @@ export default function ConversationInterface() {
               messages.map((message) => (
                 <article key={message.id} className={`message-card ${message.role}`}>
                   <span className="message-meta">{message.mode === 'voice' ? 'Guth' : 'Clóscríofa'}</span>
-                  <p>{message.text}</p>
+                  <p>{renderMessageText(message)}</p>
                 </article>
               ))
             )}
@@ -372,7 +574,7 @@ export default function ConversationInterface() {
               </button>
               <p className="hint">
                 {canRecord
-                  ? 'Taifead abairt ghearr i nGaeilge, agus fan leis an tras-scríbhinn agus leis an bhfreagra labhartha.'
+                  ? 'Taifead abairt ghearr i nGaeilge, agus ansin cuir an luch thar fhocail sa chomhrá chun aistriúchán agus canúintí a fheiceáil.'
                   : 'Ní thacaíonn an brabhsálaí seo leis an sreabhadh taifeadta a úsáideann an aip.'}
               </p>
             </div>

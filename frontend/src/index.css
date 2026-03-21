@@ -546,7 +546,100 @@ input:focus-visible {
 
 .message-card p {
   margin: 0.5rem 0 0;
+  line-height: 1.75;
   white-space: pre-wrap;
+}
+
+.gloss-word-wrap {
+  position: relative;
+}
+
+.gloss-word {
+  cursor: help;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.gloss-word:hover,
+.gloss-word.is-active,
+.gloss-word:focus-visible {
+  background: rgba(94, 181, 117, 0.18);
+  box-shadow: 0 -1px 0 rgba(29, 107, 57, 0.24) inset;
+  color: var(--green-800);
+  outline: none;
+}
+
+.gloss-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 20;
+  width: min(18rem, calc(100vw - 4rem));
+  padding: 0.8rem 0.9rem;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 28px rgba(31, 90, 47, 0.14);
+}
+
+.message-card.user .gloss-popover {
+  left: auto;
+  right: 0;
+}
+
+.gloss-word-heading {
+  margin: 0;
+  font-family: 'Pixelify Sans', 'Trebuchet MS', sans-serif;
+  font-size: 0.9rem;
+  color: var(--green-800);
+  text-transform: uppercase;
+}
+
+.gloss-translation {
+  margin: 0.35rem 0 0;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.gloss-dialects {
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.gloss-dialects li {
+  display: grid;
+  grid-template-columns: 5.25rem 1fr;
+  gap: 0.45rem;
+}
+
+.gloss-dialects span {
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gloss-dialects strong {
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.gloss-note,
+.gloss-loading,
+.gloss-error {
+  margin: 0.55rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.gloss-error {
+  color: #8b5517;
 }
 
 .message-meta {
