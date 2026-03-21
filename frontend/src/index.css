@@ -883,6 +883,29 @@ button {
   border-color: #14b8a6;
 }
 
+.cards-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.cards-pagination button {
+  background: #213137;
+  border: 1px solid #3f5b63;
+  color: #d6fff8;
+}
+
+.cards-pagination button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cards-pagination span {
+  color: #b9ded8;
+  font-weight: 600;
+}
+
 .unlocked-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -956,4 +979,408 @@ button {
   .nav-card {
     min-width: 100%;
   }
+}
+
+/* ===== NEW FEATURES CSS ===== */
+
+/* TAB NAVIGATION */
+.sidequest-tab-nav {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.sidequest-tab-nav button {
+  padding: 0.7rem 1.2rem;
+  border: 2px solid transparent;
+  background: rgba(207, 115, 35, 0.15);
+  color: #e8a857;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.sidequest-tab-nav button:hover {
+  background: rgba(207, 115, 35, 0.3);
+  transform: translateY(-2px);
+}
+
+.sidequest-tab-nav button.active {
+  background: linear-gradient(135deg, #cf7323, #e8a857);
+  border-color: #fff;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(207, 115, 35, 0.4);
+}
+
+/* REGIONAL VARIATIONS */
+.regional-variations {
+  background: rgba(79, 39, 131, 0.12);
+  border-left: 4px solid #9d50bb;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.regional-variations h4 {
+  margin-top: 0;
+  color: #d7a7ff;
+}
+
+.region-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.region-tabs button {
+  padding: 0.5rem 1rem;
+  background: rgba(144, 238, 195, 0.1);
+  border: 1px solid rgba(144, 238, 195, 0.3);
+  color: #7fded8;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.region-tabs button:hover {
+  background: rgba(144, 238, 195, 0.2);
+}
+
+.region-tabs button.active {
+  background: #90eec3;
+  color: #0d2818;
+  font-weight: 700;
+  border-color: #90eec3;
+}
+
+.region-text {
+  color: #b8e6d5;
+  font-style: italic;
+  padding: 0.75rem;
+  background: rgba(144, 238, 195, 0.05);
+  border-radius: 6px;
+  margin: 0;
+}
+
+/* SCENARIO CHALLENGES */
+.card-scenario {
+  margin: 0.75rem 0;
+  cursor: pointer;
+}
+
+.card-scenario summary {
+  color: #d7a7ff;
+  font-weight: 600;
+  padding: 0.5rem;
+  background: rgba(79, 39, 131, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.card-scenario summary:hover {
+  background: rgba(79, 39, 131, 0.25);
+}
+
+.card-scenario p {
+  color: #c7a7ff;
+  font-size: 0.95rem;
+  margin: 0.75rem 0;
+}
+
+.scenario-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scenario-btn {
+  padding: 0.75rem;
+  background: rgba(168, 213, 186, 0.1);
+  border: 2px solid #a8d5ba;
+  color: #a8d5ba;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.scenario-btn:hover:not(:disabled) {
+  background: rgba(168, 213, 186, 0.25);
+  transform: translateX(4px);
+}
+
+.scenario-btn:disabled {
+  cursor: not-allowed;
+}
+
+.scenario-btn.correct {
+  background: rgba(104, 211, 145, 0.3);
+  border-color: #68d391;
+  color: #68d391;
+}
+
+.scenario-btn.incorrect {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: #f87171;
+  color: #f87171;
+}
+
+.feedback {
+  display: block;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  font-weight: 700;
+}
+
+/* HISTORY NOTE */
+.card-history {
+  margin: 0.75rem 0;
+}
+
+.card-history summary {
+  color: #daf8ea;
+  font-weight: 600;
+  padding: 0.5rem;
+  background: rgba(17, 62, 50, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.card-history summary:hover {
+  background: rgba(17, 62, 50, 0.25);
+}
+
+.card-history p {
+  color: #b8e6d5;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* REGIONAL VARIATIONS IN CARD */
+.card-regions {
+  margin: 0.75rem 0;
+}
+
+.card-regions summary {
+  color: #7fded8;
+  font-weight: 600;
+  padding: 0.5rem;
+  background: rgba(127, 222, 216, 0.05);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.card-regions ul {
+  list-style: none;
+  padding: 0.75rem;
+  margin: 0.5rem 0 0;
+  background: rgba(127, 222, 216, 0.05);
+  border-radius: 6px;
+}
+
+.card-regions li {
+  padding: 0.4rem 0;
+  color: #90eec3;
+  font-size: 0.9rem;
+}
+
+/* VOICE RECORDING BUTTON */
+button.recording {
+  animation: pulse 1.5s infinite;
+  background: rgba(220, 38, 38, 0.3) !important;
+  border-color: #ff6b6b !important;
+  color: #ff6b6b !important;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* SEASONAL SECTION */
+.seasonal-section {
+  padding: 1.5rem;
+  background: rgba(207, 115, 35, 0.08);
+  border: 2px dashed rgba(207, 115, 35, 0.3);
+  border-radius: 12px;
+  margin: 2rem 0;
+}
+
+.seasonal-section h2 {
+  text-align: center;
+  color: #e8a857;
+  margin-top: 0;
+  background: linear-gradient(135deg, #cf7323, #e8a857);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.seasonal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.seasonal-card {
+  background: linear-gradient(145deg, rgba(207, 115, 35, 0.15), rgba(79, 39, 131, 0.1));
+  border: 2px solid rgba(207, 115, 35, 0.4);
+  border-radius: 12px;
+  padding: 1.25rem;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.seasonal-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 8px 24px rgba(207, 115, 35, 0.2);
+  border-color: rgba(207, 115, 35, 0.6);
+}
+
+.seasonal-badge {
+  display: inline-block;
+  background: rgba(207, 115, 35, 0.3);
+  color: #e8a857;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.seasonal-card h3 {
+  color: #e8a857;
+  margin: 0.5rem 0;
+}
+
+.seasonal-card .culture-note {
+  color: #d7a7ff;
+  background: rgba(79, 39, 131, 0.1);
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid #9d50bb;
+  margin: 0.75rem 0;
+}
+
+.seasonal-card .history {
+  color: #a8d5ba;
+  font-size: 0.9rem;
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+
+.empty-seasonal {
+  text-align: center;
+  padding: 2rem;
+  color: #90a7a6;
+}
+
+.empty-seasonal ul {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+.empty-seasonal li {
+  padding: 0.5rem 0;
+  color: #7fded8;
+}
+
+/* LEADERBOARD SECTION */
+.leaderboard-section {
+  padding: 1.5rem;
+  background: rgba(144, 238, 195, 0.05);
+  border: 2px solid rgba(144, 238, 195, 0.2);
+  border-radius: 12px;
+  margin: 2rem 0;
+}
+
+.leaderboard-section h2 {
+  text-align: center;
+  color: #90eec3;
+  margin-top: 0;
+}
+
+.leaderboard-user-stats {
+  background: rgba(127, 222, 216, 0.1);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.leaderboard-user-stats p {
+  margin: 0.5rem 0;
+  color: #7fded8;
+}
+
+.leaderboard-user-stats code {
+  background: rgba(79, 39, 131, 0.2);
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  color: #d7a7ff;
+  font-weight: 600;
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.leaderboard-table thead {
+  background: rgba(127, 222, 216, 0.1);
+}
+
+.leaderboard-table th {
+  padding: 0.75rem;
+  text-align: left;
+  color: #90eec3;
+  font-weight: 700;
+  border-bottom: 2px solid rgba(144, 238, 195, 0.3);
+}
+
+.leaderboard-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid rgba(144, 238, 195, 0.1);
+  color: #c7e9dd;
+}
+
+.leaderboard-table .rank {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.leaderboard-table .cards-learned,
+.leaderboard-table .score {
+  text-align: center;
+  font-weight: 600;
+}
+
+.leaderboard-table tr.current-user {
+  background: rgba(207, 115, 35, 0.1);
+}
+
+.leaderboard-table tr.current-user td {
+  color: #e8a857;
+  font-weight: 600;
+}
+
+.empty-leaderboard {
+  text-align: center;
+  padding: 2rem;
+  color: #90a7a6;
 }
