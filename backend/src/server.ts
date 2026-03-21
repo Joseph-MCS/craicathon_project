@@ -46,6 +46,10 @@ type TranslateRequest = {
   text?: string;
 };
 
+type PronunciationRequest = {
+  text?: string;
+};
+
 type OpenAIErrorPayload = {
   error?: {
     message?: string;
@@ -426,6 +430,55 @@ async function translateIrishToEnglish(text: string): Promise<string> {
   return translation;
 }
 
+async function generateIrishPhoneticPronunciation(text: string): Promise<string> {
+  ensureConfigured();
+
+  const response = await fetch(`${OPENAI_API_BASE}/responses`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: CHAT_MODEL,
+      max_output_tokens: 80,
+      reasoning: {
+        effort: 'minimal'
+      },
+      instructions: [
+        'You convert Irish (Gaeilge) words and short phrases into easy phonetic pronunciation for English speakers.',
+        'Return only the phonetic pronunciation string.',
+        'Do not include IPA, labels, punctuation wrappers, or explanations.'
+      ].join(' '),
+      input: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text
+            }
+          ]
+        }
+      ]
+    })
+  });
+
+  const payload = (await response.json()) as OpenAIResponsePayload;
+
+  if (!response.ok) {
+    throw new Error(extractOpenAIError(payload));
+  }
+
+  const pronunciation = readResponseText(payload);
+
+  if (!pronunciation) {
+    throw new Error('OpenAI returned an empty pronunciation.');
+  }
+
+  return pronunciation;
+}
+
 async function synthesizeIrishReply(text: string): Promise<{ audioBase64: string; audioMimeType: string }> {
   ensureConfigured();
 
@@ -531,13 +584,41 @@ app.post('/api/translate', async (req, res) => {
   }
 
   try {
-    const translation = await translateIrishToEnglish(cleanText);
+    const [translation, pronunciation] = await Promise.all([
+      translateIrishToEnglish(cleanText),
+      generateIrishPhoneticPronunciation(cleanText)
+    ]);
 
     return res.json({
-      translation
+      translation,
+      pronunciation
     });
   } catch (error) {
     console.error('Translation failed:', error);
+    return res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/pronunciation', async (req, res) => {
+  const { text } = req.body as PronunciationRequest;
+  const cleanText = typeof text === 'string' ? text.trim() : '';
+
+  if (!cleanText) {
+    return res.status(400).json({ error: 'Text is required.' });
+  }
+
+  if (cleanText.length > 280) {
+    return res.status(400).json({ error: 'Text is too long. Select a short word or phrase.' });
+  }
+
+  try {
+    const pronunciation = await generateIrishPhoneticPronunciation(cleanText);
+
+    return res.json({
+      pronunciation
+    });
+  } catch (error) {
+    console.error('Pronunciation failed:', error);
     return res.status(500).json({ error: getErrorMessage(error) });
   }
 });

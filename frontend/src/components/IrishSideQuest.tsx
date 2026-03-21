@@ -43,6 +43,16 @@ type CardView = 'unlocked' | 'saved' | 'learned';
 const FAVORITES_KEY = 'sidequest_favorites';
 const LEARNED_KEY = 'sidequest_learned';
 const UNLOCKED_KEY = 'sidequest_unlocked';
+const CONVERSATION_FLASHCARD_STORAGE_KEY = 'craicathon.flashcards.v1';
+
+type ConversationFlashcard = {
+  id?: unknown;
+  front?: unknown;
+  back?: unknown;
+  irish?: unknown;
+  english?: unknown;
+  pronunciation?: unknown;
+};
 
 function readSet(key: string): Set<string> {
   const raw = localStorage.getItem(key);
@@ -60,6 +70,128 @@ function readSet(key: string): Set<string> {
 
 function writeSet(key: string, values: Set<string>) {
   localStorage.setItem(key, JSON.stringify([...values]));
+}
+
+function normalizeCardText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+async function fetchPhoneticPronunciation(phrase: string): Promise<string> {
+  const response = await fetch('http://localhost:3001/api/pronunciation', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ text: phrase })
+  });
+  const payload = (await response.json()) as { pronunciation?: string; error?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.error || 'Pronunciation request failed.');
+  }
+
+  return typeof payload.pronunciation === 'string' && payload.pronunciation.trim()
+    ? payload.pronunciation.trim()
+    : 'Use Hear it and repeat phrase-by-phrase.';
+}
+
+function loadConversationFlashcards(): SlangCard[] {
+  const raw = localStorage.getItem(CONVERSATION_FLASHCARD_STORAGE_KEY);
+
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map((item): SlangCard | null => {
+        if (typeof item !== 'object' || item === null) {
+          return null;
+        }
+
+        const card = item as ConversationFlashcard;
+        const phrase = normalizeCardText(card.front) || normalizeCardText(card.irish);
+        const meaning = normalizeCardText(card.back) || normalizeCardText(card.english);
+        const pronunciation = normalizeCardText(card.pronunciation);
+        const rawId = normalizeCardText(card.id);
+
+        if (!phrase || !meaning) {
+          return null;
+        }
+
+        const fallbackId = `${phrase.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-')}-${meaning
+          .toLocaleLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .slice(0, 24)}`;
+
+        return {
+          id: `conversation-${rawId || fallbackId}`,
+          phrase,
+          pronunciation: pronunciation || 'Use Hear it and repeat phrase-by-phrase.',
+          meaning,
+          whenToUse: 'Use this in similar conversation contexts from your practice chat.',
+          example: `${phrase} -> ${meaning}`,
+          cultureNote: 'Saved from your AI conversation flashcard bank.',
+          wordBreakdown: []
+        };
+      })
+      .filter((card): card is SlangCard => card !== null);
+  } catch {
+    return [];
+  }
+}
+
+function persistConversationPronunciations(updates: Array<{ phrase: string; pronunciation: string }>) {
+  if (updates.length === 0) {
+    return;
+  }
+
+  const raw = localStorage.getItem(CONVERSATION_FLASHCARD_STORAGE_KEY);
+
+  if (!raw) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+
+    if (!Array.isArray(parsed)) {
+      return;
+    }
+
+    const pronunciationByPhrase = new Map(
+      updates.map((item) => [item.phrase.toLocaleLowerCase(), item.pronunciation])
+    );
+
+    const normalized = parsed.map((item) => {
+      if (typeof item !== 'object' || item === null) {
+        return item;
+      }
+
+      const record = item as Record<string, unknown>;
+      const phrase = normalizeCardText(record.front) || normalizeCardText(record.irish);
+      const mappedPronunciation = pronunciationByPhrase.get(phrase.toLocaleLowerCase());
+
+      if (!mappedPronunciation) {
+        return item;
+      }
+
+      return {
+        ...record,
+        pronunciation: mappedPronunciation
+      };
+    });
+
+    localStorage.setItem(CONVERSATION_FLASHCARD_STORAGE_KEY, JSON.stringify(normalized));
+  } catch (error) {
+    console.error('Failed to persist conversation pronunciations', error);
+  }
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -130,14 +262,69 @@ export default function IrishSideQuest() {
 
       const fetchedDaily = normalizeCard(dailyRes.data.card as RawSlangCard);
       const fetchedCards = (cardsRes.data.cards as RawSlangCard[]).map(normalizeCard);
+      const conversationCards = loadConversationFlashcards();
+      const conversationIds = conversationCards.map((card) => card.id);
+      const mergedCards = [...fetchedCards];
+      const knownPhrases = new Set(mergedCards.map((card) => card.phrase.toLocaleLowerCase()));
+      const needsPronunciation = conversationCards.filter(
+        (card) => card.pronunciation === 'Use Hear it and repeat phrase-by-phrase.'
+      );
+
+      if (needsPronunciation.length > 0) {
+        const updateResults = await Promise.allSettled(
+          needsPronunciation.map(async (card) => ({
+            id: card.id,
+            phrase: card.phrase,
+            pronunciation: await fetchPhoneticPronunciation(card.phrase)
+          }))
+        );
+        const updates = updateResults
+          .filter((result): result is PromiseFulfilledResult<{ id: string; phrase: string; pronunciation: string }> => (
+            result.status === 'fulfilled'
+          ))
+          .map((result) => result.value);
+        const pronunciationById = new Map(updates.map((item) => [item.id, item.pronunciation]));
+
+        for (const card of conversationCards) {
+          const updatedPronunciation = pronunciationById.get(card.id);
+          if (updatedPronunciation) {
+            card.pronunciation = updatedPronunciation;
+          }
+        }
+
+        persistConversationPronunciations(
+          updates.map((item) => ({ phrase: item.phrase, pronunciation: item.pronunciation }))
+        );
+      }
+
+      for (const card of conversationCards) {
+        const normalizedPhrase = card.phrase.toLocaleLowerCase();
+        if (knownPhrases.has(normalizedPhrase)) {
+          continue;
+        }
+        knownPhrases.add(normalizedPhrase);
+        mergedCards.push(card);
+      }
 
       setDailyCard(fetchedDaily);
-      setCards(fetchedCards);
+      setCards(mergedCards);
 
       setUnlocked(prev => {
         const next = new Set(prev);
         next.add(fetchedDaily.id);
+        for (const id of conversationIds) {
+          next.add(id);
+        }
         writeSet(UNLOCKED_KEY, next);
+        return next;
+      });
+
+      setFavorites(prev => {
+        const next = new Set(prev);
+        for (const id of conversationIds) {
+          next.add(id);
+        }
+        writeSet(FAVORITES_KEY, next);
         return next;
       });
     };

@@ -40,6 +40,7 @@ type VoiceChatResponse = TextChatResponse & {
 
 type TranslateResponse = {
   translation: string;
+  pronunciation?: string;
 };
 
 type Flashcard = {
@@ -48,6 +49,7 @@ type Flashcard = {
   back: string;
   irish: string;
   english: string;
+  pronunciation: string;
   formatVersion: 1;
   source: 'conversation-selection';
   createdAt: string;
@@ -168,6 +170,7 @@ function loadStoredFlashcards(): Flashcard[] {
           english?: unknown;
           front?: unknown;
           back?: unknown;
+          pronunciation?: unknown;
           id?: unknown;
           createdAt?: unknown;
         };
@@ -185,6 +188,9 @@ function loadStoredFlashcards(): Flashcard[] {
           back,
           irish: front,
           english: back,
+          pronunciation: typeof raw.pronunciation === 'string' && raw.pronunciation.trim()
+            ? raw.pronunciation.trim()
+            : 'Tap Hear it to listen and practice.',
           formatVersion: 1,
           source: 'conversation-selection',
           createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString()
@@ -563,6 +569,7 @@ export default function ConversationInterface() {
         back: successPayload.translation.trim(),
         irish: phrase,
         english: successPayload.translation.trim(),
+        pronunciation: successPayload.pronunciation?.trim() || 'Tap Hear it to listen and practice.',
         formatVersion: 1,
         source: 'conversation-selection',
         createdAt: new Date().toISOString()
@@ -612,6 +619,7 @@ export default function ConversationInterface() {
       back: card.back,
       irish: card.irish,
       english: card.english,
+      pronunciation: card.pronunciation,
       formatVersion: card.formatVersion,
       source: card.source,
       createdAt: card.createdAt
@@ -626,13 +634,14 @@ export default function ConversationInterface() {
       return;
     }
 
-    const header = ['id', 'front', 'back', 'irish', 'english', 'createdAt', 'formatVersion', 'source'];
+    const header = ['id', 'front', 'back', 'irish', 'english', 'pronunciation', 'createdAt', 'formatVersion', 'source'];
     const rows = flashcards.map((card) => [
       card.id,
       card.front,
       card.back,
       card.irish,
       card.english,
+      card.pronunciation,
       card.createdAt,
       String(card.formatVersion),
       card.source
