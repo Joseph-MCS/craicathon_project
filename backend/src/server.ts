@@ -9,6 +9,9 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'mistral';
 const OPENAI_API_BASE = 'https://api.openai.com/v1';
 const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-5-mini';
 const TRANSCRIPTION_MODEL = process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-transcribe';
@@ -85,6 +88,22 @@ type SlangCard = {
     soundLike: string;
     tip: string;
   }>;
+  regions?: {
+    dublin?: string;
+    cork?: string;
+    galway?: string;
+  };
+  scenario?: {
+    situation: string;
+    options: Array<{
+      text: string;
+      correct: boolean;
+      feedback: string;
+    }>;
+  };
+  historyNote?: string;
+  isSeasonalCard?: boolean;
+  seasonalType?: 'brigid' | 'patrick' | 'samhain' | null;
 };
 
 const sideQuestCards: SlangCard[] = [
@@ -100,7 +119,23 @@ const sideQuestCards: SlangCard[] = [
       { irish: 'Tá', soundLike: 'taw', tip: 'Long open a sound.' },
       { irish: 'sé', soundLike: 'sheh', tip: 'Soft sh sound at the start.' },
       { irish: 'grand', soundLike: 'grand', tip: 'Same as English here.' }
-    ]
+    ],
+    regions: {
+      dublin: 'Tá sé go deas (more formal alternative)',
+      cork: 'Tá sé breá liom (I love it - used for emphasis)',
+      galway: 'Tá sé ar dheis (traditional Connemara version)'
+    },
+    scenario: {
+      situation: "A colleague offers you tea. How do you respond if it's perfect?",
+      options: [
+        { text: 'Tá sé grand, go raibh maith agat', correct: true, feedback: '✓ Perfect! You thanked them warmly.' },
+        { text: 'Níl sé grand', correct: false, feedback: '✗ This means "It\'s not fine" - the opposite!' },
+        { text: 'Grand amháin', correct: false, feedback: '✗ Close, but the phrase structure is off.' }
+      ]
+    },
+    historyNote: 'Used in Irish since medieval times, "grand" evolved into Hiberno-English as the universal response during British colonial period.',
+    isSeasonalCard: false,
+    seasonalType: null
   },
   {
     id: 'whisht',
@@ -115,7 +150,23 @@ const sideQuestCards: SlangCard[] = [
       { irish: 'ciúin', soundLike: 'kyoo-in', tip: 'Two beats: kyoo + in.' },
       { irish: 'a', soundLike: 'uh', tip: 'Very light unstressed sound.' },
       { irish: 'chara', soundLike: 'khar-uh', tip: 'Breathy kh at the start.' }
-    ]
+    ],
+    regions: {
+      dublin: 'Shh nóiméad (just "shh" with a word for moment)',
+      cork: 'Stad anois (more direct: stop now)',
+      galway: 'Fan go fóill (traditional: wait a moment)'
+    },
+    scenario: {
+      situation: 'You\'re in a traditional Irish pub and the storyteller is about to speak. Your friend is talking loudly. What do you say?',
+      options: [
+        { text: 'Fan ciúin a chara!', correct: true, feedback: '✓ Brilliant! Everyone likes a respectful listener in a traditional setting.' },
+        { text: 'Stad, a amadáin!', correct: false, feedback: '✗ Too harsh - you\'d offend your friend!' },
+        { text: 'Tóg go bog é', correct: false, feedback: '✗ This means "take it easy" but doesn\'t ask for quiet.' }
+      ]
+    },
+    historyNote: 'From Irish folklore tradition where silence was sacred during storytelling (seanchaí) in ancient céilis.',
+    isSeasonalCard: false,
+    seasonalType: null
   },
   {
     id: 'deadly',
@@ -128,7 +179,23 @@ const sideQuestCards: SlangCard[] = [
     wordBreakdown: [
       { irish: 'Sin', soundLike: 'shin', tip: 'Soft sh sound.' },
       { irish: 'marfach', soundLike: 'mar-fakh', tip: 'Final ch is throaty, not "ch" as in chair.' }
-    ]
+    ],
+    regions: {
+      dublin: 'Go tobann (suddenly - used to emphasize surprise)',
+      cork: 'Draíochta! (magical exclamation)',
+      galway: 'Ar fheabhas! (excellent - most formal)'
+    },
+    scenario: {
+      situation: 'Your friend just told you they got a job as an Irish language teacher. What\'s your reaction?',
+      options: [
+        { text: 'Sin marfach!', correct: true, feedback: '✓ Perfect enthusiasm! Your friend will feel your genuine joy.' },
+        { text: 'Sin dúr!', correct: false, feedback: '✗ This means "stupid" - definitely not what you meant!' },
+        { text: 'Sin go breá!', correct: false, feedback: '✗ This is more about love/preference, not fitting here.' }
+      ]
+    },
+    historyNote: 'The use of deadly words positively dates to Irish youth slang culture of the 1980s-90s Dublin scene.',
+    isSeasonalCard: false,
+    seasonalType: null
   },
   {
     id: 'craic',
@@ -143,7 +210,23 @@ const sideQuestCards: SlangCard[] = [
       { irish: 'é', soundLike: 'eh', tip: 'Short and light.' },
       { irish: 'an', soundLike: 'un', tip: 'Neutral unstressed vowel.' },
       { irish: 'craic', soundLike: 'crack', tip: 'Rhymes with "back".' }
-    ]
+    ],
+    regions: {
+      dublin: 'Cad atá ar siúl? (What\'s going on? - more common in north Dublin)',
+      cork: 'Conas atá tú? (How are you? - traditional greeting)',
+      galway: 'Cad é an ceol? (What\'s the music? - playful variation)'
+    },
+    scenario: {
+      situation: 'You meet an old Irish friend on the street after months. How do you greet them warmly?',
+      options: [
+        { text: 'Cad é an craic, a chara?', correct: true, feedback: '✓ Genuine, warm, and authentically Irish!' },
+        { text: 'Cad é an báisteach?', correct: false, feedback: '✗ That literally means "What\'s the rain?" - awkward!' },
+        { text: 'Cad a tharla?', correct: false, feedback: '✗ This means "What happened?" - implies something went wrong.' }
+      ]
+    },
+    historyNote: '"Craic" (from Old Irish "imcraid" meaning entertainment) was revived culturally in 1980s as symbol of Irish identity against anglicization.',
+    isSeasonalCard: false,
+    seasonalType: null
   },
   {
     id: 'go-on',
@@ -157,7 +240,23 @@ const sideQuestCards: SlangCard[] = [
       { irish: 'Ar', soundLike: 'er', tip: 'Short, quick opening.' },
       { irish: 'aghaidh', soundLike: 'ah-hig', tip: 'Middle gh is soft and breathy.' },
       { irish: 'leat', soundLike: 'lat', tip: 'Single beat, crisp t ending.' }
-    ]
+    ],
+    regions: {
+      dublin: 'Téigh ann! (Go there! - direct Dublin style)',
+      cork: 'Ar agus ar! (Really hammer it home)',
+      galway: 'Tobac leat! (Off you go! - Connemara traditional)'
+    },
+    scenario: {
+      situation: 'Your nervous friend is about to give their first Irish speech at a céilí. How do you boost their confidence?',
+      options: [
+        { text: 'Ar aghaidh leat, a chara!', correct: true, feedback: '✓ Perfect encouragement for a traditional setting!' },
+        { text: 'Shábháil tú é!', correct: false, feedback: '✗ This means "you saved it" - past tense, not encouraging!' },
+        { text: 'Is fearr liom', correct: false, feedback: '✗ This means "I prefer" - totally off topic.' }
+      ]
+    },
+    historyNote: 'Sports coaching in Irish schools has kept this phrase alive; used extensively at Gaelic Athletic Association (GAA) matches since 1884.',
+    isSeasonalCard: false,
+    seasonalType: null
   },
   {
     id: 'surelook',
@@ -173,7 +272,116 @@ const sideQuestCards: SlangCard[] = [
       { irish: 'e', soundLike: 'eh', tip: 'Short and light.' },
       { irish: 'an', soundLike: 'un', tip: 'Very light unstressed vowel.' },
       { irish: 'saol', soundLike: 'sayl', tip: 'Single syllable, long ay sound.' }
-    ]
+    ],
+    regions: {
+      dublin: 'Bhuel, timpeall an tsolais (life\'s about the light - more philosophical)',
+      cork: 'Ná bí i do bhrón (don\'t be sad - empathetic approach)',
+      galway: 'An saol go fóill (life still goes on - accepting tone)'
+    },
+    scenario: {
+      situation: 'A tourist lost their Irish language guidebook during a rainstorm in Galway. How do you comfort them philosophically?',
+      options: [
+        { text: 'Bhuel, sin é an saol, a chara!', correct: true, feedback: '✓ Authentic Irish wisdom - they\'ll remember this kindness!' },
+        { text: 'Faraor go leor (sadly enough)', correct: false, feedback: '✗ Too negative - doesn\'t offer comfort.' },
+        { text: 'Is breá liom an ghaoth (I love the wind)', correct: false, feedback: '✗ Irrelevant and confusing!' }
+      ]
+    },
+    historyNote: 'This philosophical acceptance rooted in Irish Catholic poetry tradition; popularized in modern times by RTE Irish dramas since 1970s.',
+    isSeasonalCard: false,
+    seasonalType: null
+  },
+  // Seasonal Cards
+  {
+    id: 'brigid-card',
+    phrase: 'Naomh Bhríde go raibh maith aici',
+    pronunciation: 'nay-v vree-jeh guh rev muh ah-jee',
+    meaning: 'Saint Brigid, thank you (blessing)',
+    whenToUse: 'On St. Brigid\'s Day (February 1) or when blessing someone\'s home.',
+    example: 'Ar Lá Fhéile Bhríde, a raibh maith aici as a beannacht.',
+    cultureNote: 'St. Brigid (450-520 AD) is Ireland\'s patron saint of wells, poetry, and healing. Her feast day marks the beginning of spring in Celtic tradition.',
+    wordBreakdown: [
+      { irish: 'Naomh', soundLike: 'nay-v', tip: 'Silent m before b.' },
+      { irish: 'Bhríde', soundLike: 'vree-jeh', tip: 'Feminine genitive triggers lenition.' },
+      { irish: 'go', soundLike: 'guh', tip: 'Linking word for gratitude.' },
+      { irish: 'raibh', soundLike: 'rev', tip: 'Past tense of "to be".' }
+    ],
+    regions: {
+      dublin: 'Lá Fhéile Bhríde (modern urban form)',
+      cork: 'Féile Bhríde an spréacharnach (the sparking festival)',
+      galway: 'Imbolc i réim (Celtic name: Imbolc season)'
+    },
+    scenario: {
+      situation: 'You\'re visiting a traditional Irish home on St. Brigid\'s Day. The host lights a candle asking for blessings. What do you say?',
+      options: [
+        { text: 'Naomh Bhríde go raibh maith aici!', correct: true, feedback: '✓ Respectful and culturally aware! The host smiles warmly.' },
+        { text: 'Brigid is gheal (Brigid is bright)', correct: false, feedback: '✗ Close meaning but wrong prayer structure.' },
+        { text: 'Tús an earraigh (start of spring)', correct: false, feedback: '✗ More poetic than prayerful - not quite right.' }
+      ]
+    },
+    historyNote: 'St. Brigid\'s crosses are woven on her feast day; her sacred wells still draw pilgrims seeking healing. Imbolc (Feb 1) is the first day of spring in Celtic calendar.',
+    isSeasonalCard: true,
+    seasonalType: 'brigid'
+  },
+  {
+    id: 'patrick-card',
+    phrase: 'Lá Fhéile Phádraig sona duit!',
+    pronunciation: 'law hay-luh fah-rig sun-uh gwit',
+    meaning: 'Happy St. Patrick\'s Day! (literal: A lucky St. Patrick\'s Day feast day to you)',
+    whenToUse: 'On March 17th to greet people celebrating Irish culture.',
+    example: 'Lá Fhéile Phádraig sona duit! Subh scéal ar gréine, is éadach ar foluain.',
+    cultureNote: 'St. Patrick (387-461 AD) brought Christianity to Ireland and is commemorated globally. In Ireland, it\'s a spiritual and cultural celebration.',
+    wordBreakdown: [
+      { irish: 'Lá', soundLike: 'law', tip: 'Day - long á sound.' },
+      { irish: 'Fhéile', soundLike: 'hay-luh', tip: 'Feast (lenited form).' },
+      { irish: 'Phádraig', soundLike: 'fah-rig', tip: 'Patrick (lenited patron form).' },
+      { irish: 'sona', soundLike: 'sun-uh', tip: 'Lucky/happy.' }
+    ],
+    regions: {
+      dublin: 'Nollaig na Foluain (Wandering Christmas - poetic alternative)',
+      cork: 'Féile Phádraig i mbaile na sealadh (traditional village celebration)',
+      galway: 'Féile an tSolais (Festival of Light - ancient name)'
+    },
+    scenario: {
+      situation: 'You\'re at a céilí on St. Patrick\'s Day and meet locals. How do you greet them authentically?',
+      options: [
+        { text: 'Lá Fhéile Phádraig sona duit!', correct: true, feedback: '✓ Perfectly authentic! The locals are impressed!' },
+        { text: 'Happy St. Patrick\'s Day!', correct: false, feedback: '✗ English works but you\'re in an Irish-speaking space!' },
+        { text: 'Pádraig ó Éirinn!', correct: false, feedback: '✗ Close but grammatically off - "Patrick from Ireland" doesn\'t fit.' }
+      ]
+    },
+    historyNote: 'St. Patrick\'s missionary work (432 AD onwards) converted Ireland to Christianity within a generation. Despite global commercialization, Irish families attend mass on this holy day.',
+    isSeasonalCard: true,
+    seasonalType: 'patrick'
+  },
+  {
+    id: 'samhain-card',
+    phrase: 'Beannacht Shamhna ort!',
+    pronunciation: 'ban-ukh hau-nuh ort',
+    meaning: 'Blessings of Samhain upon you! (Celtic New Year greeting)',
+    whenToUse: 'On October 31st / November 1st during the Celtic New Year celebration.',
+    example: 'Oíche Shamhna na spréacharnach - beannacht orm ar na mairbh.',
+    cultureNote: 'Samhain (Nov 1) marks the Celtic New Year and the thinning of veil between worlds. Bonfires were lit to guide ancestor spirits.',
+    wordBreakdown: [
+      { irish: 'Beannacht', soundLike: 'ban-ukht', tip: 'Blessing - very Irish.' },
+      { irish: 'Shamhna', soundLike: 'hau-nuh', tip: 'Of Samhain (lenited genitive).' },
+      { irish: 'ort', soundLike: 'ort', tip: 'On you (preposition).' }
+    ],
+    regions: {
+      dublin: 'Oíche Shamhna i nGaoth Dobhair (modern remembrance form)',
+      cork: 'An Samhain thoir (eastern Samhain - ancient timing)',
+      galway: 'Tine Shamhna na spréite (Samhain spirit fires)'
+    },
+    scenario: {
+      situation: 'You\'re bonfire-sitting on Samhain night in Connemara with elderly Irish speakers. How do you respectfully greet them?',
+      options: [
+        { text: 'Beannacht Shamhna ort!', correct: true, feedback: '✓ Beautifully respectful! They recognize your spiritual awareness.' },
+        { text: 'Oíche Shamhna sona!', correct: false, feedback: '✗ Close but "sona" is for luck - "beannacht" is more spiritually appropriate here.' },
+        { text: 'Halloween go raibh maith agat', correct: false, feedback: '✗ English word in Irish context - less authentic!' }
+      ]
+    },
+    historyNote: 'Samhain originates from pre-Christian Celtic calendar; Christianized as All Hallows\' Eve. Modern Halloween preserves ancient Celtic fire festival traditions.',
+    isSeasonalCard: true,
+    seasonalType: 'samhain'
   }
 ];
 
@@ -513,12 +721,15 @@ async function synthesizeIrishReply(text: string): Promise<{ audioBase64: string
 app.get('/api/health', (_req, res) => {
   res.json({
     configured: Boolean(OPENAI_API_KEY),
+    ollamaConfigured: Boolean(OLLAMA_API_KEY),
     models: {
       chat: CHAT_MODEL,
       transcription: TRANSCRIPTION_MODEL,
       tts: TTS_MODEL,
-      voice: TTS_VOICE
+      voice: TTS_VOICE,
+      ollama: OLLAMA_MODEL
     },
+    ollamaBaseUrl: OLLAMA_BASE_URL,
     voiceDisclosure: VOICE_DISCLOSURE
   });
 });
@@ -647,6 +858,74 @@ app.get('/api/sidequest/cards', (_req, res) => {
 
 app.get('/api/sidequest/daily', (_req, res) => {
   res.json({ card: getDailyCard(sideQuestCards) });
+});
+
+app.get('/api/sidequest/seasonal', (_req, res) => {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const date = now.getDate();
+
+  let seasonalType: 'brigid' | 'patrick' | 'samhain' | null = null;
+
+  if ((month === 2 && date === 1) || month === 2) {
+    seasonalType = 'brigid';
+  } else if ((month === 3 && date === 17) || month === 3) {
+    seasonalType = 'patrick';
+  } else if ((month === 10 && date >= 31) || month === 11) {
+    seasonalType = 'samhain';
+  }
+
+  const seasonal = seasonalType
+    ? sideQuestCards.filter(c => c.seasonalType === seasonalType)
+    : [];
+
+  res.json({ seasonal, seasonalType });
+});
+
+app.post('/api/sidequest/leaderboard', (req, res) => {
+  const { userId, cardsLearned, score } = req.body;
+
+  if (!userId || typeof cardsLearned !== 'number' || typeof score !== 'number') {
+    return res.status(400).json({ error: 'userId, cardsLearned, and score are required.' });
+  }
+
+  // For hackathon demo: store in memory (in production, use a database)
+  const leaderboardKey = 'sidequest_leaderboard';
+  const raw = localStorage.getItem(leaderboardKey) || '[]';
+
+  try {
+    let entries = JSON.parse(raw) as Array<{ userId: string; cardsLearned: number; score: number; timestamp: number }>;
+
+    // Remove or update existing entry for this userId
+    entries = entries.filter(e => e.userId !== userId);
+
+    // Add new entry
+    entries.push({ userId, cardsLearned, score, timestamp: Date.now() });
+
+    // Sort by cardsLearned desc, then by score desc
+    entries.sort((a, b) => {
+      if (b.cardsLearned !== a.cardsLearned) return b.cardsLearned - a.cardsLearned;
+      return b.score - a.score;
+    });
+
+    localStorage.setItem(leaderboardKey, JSON.stringify(entries.slice(0, 50))); // Keep top 50
+
+    return res.json({ success: true, leaderboard: entries.slice(0, 10) });
+  } catch {
+    return res.status(500).json({ error: 'Failed to update leaderboard.' });
+  }
+});
+
+app.get('/api/sidequest/leaderboard', (_req, res) => {
+  const leaderboardKey = 'sidequest_leaderboard';
+  const raw = localStorage.getItem(leaderboardKey) || '[]';
+
+  try {
+    const entries = JSON.parse(raw) as Array<{ userId: string; cardsLearned: number; score: number; timestamp: number }>;
+    return res.json({ leaderboard: entries.slice(0, 10) });
+  } catch {
+    return res.json({ leaderboard: [] });
+  }
 });
 
 app.listen(PORT, () => {
