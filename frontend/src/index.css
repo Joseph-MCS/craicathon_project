@@ -247,7 +247,7 @@ input:focus-visible {
 
 .landing-tags span {
   padding: 0.52rem 0.9rem;
-  border-radius: 999px;
+  border-radius: 4px;
   border: 1.5px solid var(--line);
   background: rgba(255, 255, 255, 0.82);
   color: var(--green-800);
@@ -291,7 +291,7 @@ input:focus-visible {
   min-height: 10.5rem;
   text-align: left;
   padding: 1.2rem 1.1rem 1.35rem;
-  border-radius: 24px;
+  border-radius: 4px;
   border: 1.5px solid var(--line-strong);
   background: linear-gradient(180deg, #ffffff, #ecfaee);
   box-shadow: var(--shadow-md);
@@ -346,7 +346,7 @@ input:focus-visible {
 .card-view-controls button {
   min-height: 44px;
   padding: 0 18px;
-  border-radius: 999px;
+  border-radius: 4px;
   background: var(--white);
   color: var(--ink);
   border: 1.5px solid var(--line-strong);
@@ -401,7 +401,7 @@ input:focus-visible {
 .quest-button {
   min-height: 10.5rem;
   padding: 1rem;
-  border-radius: 24px;
+  border-radius: 4px;
   border: 1.5px solid var(--line-strong);
   background: linear-gradient(180deg, #ffffff, #ebf9ee);
   text-align: left;
@@ -416,8 +416,8 @@ input:focus-visible {
 
 .hero-card {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) auto;
-  gap: 1.4rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
   padding: 2rem;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 252, 239, 0.96)),
@@ -447,58 +447,10 @@ input:focus-visible {
   font-size: 1.02rem;
 }
 
-.signal-row {
-  display: grid;
-  align-content: start;
-  justify-items: end;
-  gap: 0.75rem;
-  min-width: 13rem;
-}
-
-.pill {
-  min-height: 2.55rem;
-  padding: 0 1rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  border: 1.5px solid var(--line);
-  background: rgba(255, 255, 255, 0.88);
-  color: var(--ink);
-  font-family: 'Pixelify Sans', 'Trebuchet MS', sans-serif;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  box-shadow: var(--shadow-sm);
-}
-
-.pill-ready {
-  color: var(--green-700);
-  border-color: rgba(26, 117, 54, 0.28);
-}
-
-.pill-warn {
-  background: #fff4e8;
-  color: #8b5517;
-  border-color: rgba(165, 103, 26, 0.25);
-}
-
-.pill-calm {
-  color: var(--ink-soft);
-}
-
-.pill-recording {
-  color: var(--white);
-  background: linear-gradient(135deg, var(--green-700), var(--green-600));
-  border-color: transparent;
-  box-shadow: 0 0 0 0 rgba(47, 142, 79, 0.28);
-  animation: pulse-recording 1.8s infinite;
-}
-
 .workspace {
   margin-top: 1.25rem;
   display: grid;
-  grid-template-columns: minmax(0, 1.75fr) minmax(17rem, 0.9fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.15rem;
 }
 
@@ -537,7 +489,7 @@ input:focus-visible {
   gap: 0.85rem;
   padding: 1rem;
   border: 1.5px solid var(--line);
-  border-radius: 26px;
+  border-radius: 10px;
   overflow-y: auto;
   background:
     linear-gradient(180deg, rgba(238, 252, 241, 0.72), rgba(246, 255, 247, 0.92)),
@@ -561,7 +513,7 @@ input:focus-visible {
   gap: 0.7rem;
   text-align: center;
   border: 1.5px dashed rgba(30, 112, 55, 0.3);
-  border-radius: 22px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.82);
   color: var(--ink-soft);
 }
@@ -574,7 +526,7 @@ input:focus-visible {
 .message-card {
   max-width: min(80%, 40rem);
   padding: 1rem 1rem 1.05rem;
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1.5px solid var(--line);
   background: var(--white);
   color: var(--ink);
@@ -622,7 +574,7 @@ input:focus-visible {
 .record-button,
 .send-button {
   min-height: 56px;
-  border-radius: 999px;
+  border-radius: 4px;
   color: var(--white);
   font-weight: 700;
   background: linear-gradient(135deg, var(--green-700), var(--green-600));
@@ -665,95 +617,27 @@ input:focus-visible {
   box-shadow: none;
 }
 
-.text-label {
-  color: var(--ink-soft);
-  font-size: 0.92rem;
-  font-weight: 700;
-}
-
-.text-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.75rem;
-}
-
-.text-row input {
-  min-height: 56px;
-  padding: 0 1rem;
-  border: 1.5px solid var(--line-strong);
-  border-radius: 16px;
-  background: var(--white);
-  color: var(--ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.send-button {
-  min-width: 7.5rem;
-  padding: 0 1.2rem;
-  font-family: 'Pixelify Sans', 'Trebuchet MS', sans-serif;
-  font-size: 0.94rem;
-  text-transform: uppercase;
-}
-
 .hint {
   margin: 0;
   color: var(--ink-muted);
   font-size: 0.92rem;
 }
 
-.side-panel {
-  display: grid;
-  align-content: start;
-  gap: 1rem;
+.inline-note {
+  margin-top: 0.9rem;
+  padding: 0.85rem 1rem;
+  border: 1.5px solid var(--line);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.86);
 }
 
-.info-card {
-  padding: 1.15rem 1.1rem 1.2rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 254, 244, 0.95));
-}
-
-.info-card h3 {
-  margin-bottom: 0.8rem;
-  font-size: 1rem;
-  text-transform: uppercase;
-}
-
-.info-card p {
+.inline-note p {
   margin: 0;
   color: var(--ink-soft);
 }
 
-.info-card p + p {
-  margin-top: 0.75rem;
-}
-
-.stack-list {
-  display: grid;
-  gap: 0.8rem;
-  margin: 0;
-}
-
-.stack-list div {
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.stack-list div:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-
-.stack-list dt {
-  font-family: 'Pixelify Sans', 'Trebuchet MS', sans-serif;
-  font-size: 0.68rem;
-  color: var(--ink-muted);
-  text-transform: uppercase;
-}
-
-.stack-list dd {
-  margin: 0.35rem 0 0;
-  color: var(--ink);
-  font-weight: 700;
+.subtle-note {
+  background: rgba(242, 254, 244, 0.9);
 }
 
 .error-card {
@@ -954,16 +838,6 @@ input:focus-visible {
 }
 
 @media (max-width: 960px) {
-  .hero-card,
-  .chat-header {
-    grid-template-columns: 1fr;
-    flex-direction: column;
-  }
-
-  .signal-row {
-    justify-items: start;
-  }
-
   .workspace,
   .quests-grid,
   .unlocked-grid,
@@ -1012,11 +886,6 @@ input:focus-visible {
     max-width: 88%;
   }
 
-  .text-row {
-    grid-template-columns: 1fr;
-  }
-
-  .send-button,
   .record-button,
   .secondary-button,
   .mode-switch button,

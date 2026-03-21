@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type ChatRole = 'assistant' | 'user';
 type InputMode = 'text' | 'voice';
@@ -28,14 +28,11 @@ type HealthResponse = {
   voiceDisclosure: string;
 };
 
-type TextChatResponse = {
+type VoiceChatResponse = {
   audioBase64: string;
   audioMimeType: string;
   reply: string;
   voiceDisclosure: string;
-};
-
-type VoiceChatResponse = TextChatResponse & {
   transcript: string;
 };
 
@@ -97,10 +94,8 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 export default function ConversationInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [statusText, setStatusText] = useState('Tapáil an mic, labhair i nGaeilge, agus freagróidh mé os ard.');
   const [errorText, setErrorText] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -171,7 +166,6 @@ export default function ConversationInterface() {
 
   async function playAudio(base64: string, mimeType: string) {
     setLastAudio({ base64, mimeType });
-    setIsSpeaking(true);
 
     if (audioRef.current) {
       audioRef.current.pause();
@@ -182,12 +176,10 @@ export default function ConversationInterface() {
     audioRef.current = audio;
 
     audio.onended = () => {
-      setIsSpeaking(false);
       setStatusText('Réidh don chéad abairt eile.');
     };
 
     audio.onerror = () => {
-      setIsSpeaking(false);
       setStatusText('The reply is ready. Tap replay if autoplay was blocked.');
     };
 
@@ -196,54 +188,7 @@ export default function ConversationInterface() {
       setStatusText('Ag caint anois...');
     } catch (error) {
       console.error(error);
-      setIsSpeaking(false);
       setStatusText('The reply is ready. Tap replay to hear it.');
-    }
-  }
-
-  async function sendTextMessage(message: string) {
-    const trimmedMessage = message.trim();
-
-    if (!trimmedMessage) {
-      return;
-    }
-
-    const userMessage = createMessage('user', trimmedMessage, 'text');
-    const history = buildHistory();
-
-    setMessages((currentMessages) => [...currentMessages, userMessage]);
-    setInputText('');
-    setErrorText(null);
-    setIsBusy(true);
-    setStatusText('Cumadóireacht ar an bhfreagra...');
-
-    try {
-      const response = await fetch(`${API_BASE}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          history,
-          message: trimmedMessage
-        })
-      });
-      const payload = (await response.json()) as TextChatResponse | { error?: string };
-
-      if (!response.ok) {
-        throw new Error(typeof payload === 'object' && payload && 'error' in payload ? payload.error : 'Chat failed.');
-      }
-
-      const successPayload = payload as TextChatResponse;
-      const assistantMessage = createMessage('assistant', successPayload.reply, 'text');
-      setMessages((currentMessages) => [...currentMessages, assistantMessage]);
-      await playAudio(successPayload.audioBase64, successPayload.audioMimeType);
-    } catch (error) {
-      console.error(error);
-      setErrorText(error instanceof Error ? error.message : 'Chat failed.');
-      setStatusText('Something went wrong. Try again in a moment.');
-    } finally {
-      setIsBusy(false);
     }
   }
 
@@ -372,13 +317,6 @@ export default function ConversationInterface() {
     await playAudio(lastAudio.base64, lastAudio.mimeType);
   }
 
-  function handleTextSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void sendTextMessage(inputText);
-  }
-
-  const readyLabel = isRecording ? 'Ag Éisteacht' : isBusy ? 'Ag Obair' : isSpeaking ? 'Ag Labhairt' : 'Réidh';
-
   return (
     <main className="shell">
       <section className="hero-card">
@@ -390,13 +328,6 @@ export default function ConversationInterface() {
             chuid Gaeilge, cuireann sí isteach sa chomhrá í, scríobhann sí
             freagra i nGaeilge, agus labhraíonn sí leat ar ais.
           </p>
-        </div>
-
-        <div className="signal-row">
-          <span className={`pill ${health?.configured ? 'pill-ready' : 'pill-warn'}`}>
-            {health?.configured ? 'Freastalaí réidh' : 'Gan socrú fós'}
-          </span>
-          <span className={`pill ${isRecording ? 'pill-recording' : 'pill-calm'}`}>{readyLabel}</span>
         </div>
       </section>
 
@@ -445,67 +376,18 @@ export default function ConversationInterface() {
                   : 'Ní thacaíonn an brabhsálaí seo leis an sreabhadh taifeadta a úsáideann an aip.'}
               </p>
             </div>
-
-            <form className="text-form" onSubmit={handleTextSubmit}>
-              <label className="text-label" htmlFor="irish-text">
-                Nó scríobh i nGaeilge
-              </label>
-              <div className="text-row">
-                <input
-                  disabled={isBusy}
-                  id="irish-text"
-                  onChange={(event) => setInputText(event.target.value)}
-                  placeholder="Scríobh teachtaireacht ghearr anseo..."
-                  type="text"
-                  value={inputText}
-                />
-                <button className="send-button" disabled={!inputText.trim() || isBusy || !health?.configured} type="submit">
-                  Seol
-                </button>
-              </div>
-            </form>
           </div>
-        </section>
-
-        <aside className="side-panel">
-          <section className="info-card">
-            <h3>Córas</h3>
-            <dl className="stack-list">
-              <div>
-                <dt>Tras-scríobh</dt>
-                <dd>{health?.models.transcription ?? 'Ag seiceáil...'}</dd>
-              </div>
-              <div>
-                <dt>Comhrá</dt>
-                <dd>{health?.models.chat ?? 'Ag seiceáil...'}</dd>
-              </div>
-              <div>
-                <dt>Guth</dt>
-                <dd>
-                  {health?.models.ttsProvider ?? health?.models.tts ?? 'Ag seiceáil...'} / {health?.models.voice ?? '...'}
-                </dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className="info-card">
-            <h3>Cad a tharlóidh</h3>
-            <p>Is fiú gearrthóga gearra a thriail ar dtús agus an tras-scríbhinn a sheiceáil go cúramach.</p>
-            <p>Tagann freagra labhartha ar ais ar theachtaireachtaí clóscríofa freisin, rud a chabhraíonn nuair is mian leat frása a thriail arís.</p>
-          </section>
-
-          <section className="info-card">
-            <h3>Fógra</h3>
-            <p>{health?.voiceDisclosure ?? 'The spoken reply uses an AI-generated voice.'}</p>
-          </section>
 
           {errorText ? (
-            <section className="info-card error-card">
-              <h3>Fadhb</h3>
+            <section className="inline-note error-card">
               <p>{errorText}</p>
             </section>
           ) : null}
-        </aside>
+
+          <section className="inline-note subtle-note">
+            <p>{health?.voiceDisclosure ?? 'The spoken reply uses an AI-generated voice.'}</p>
+          </section>
+        </section>
       </section>
     </main>
   );
