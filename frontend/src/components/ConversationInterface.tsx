@@ -30,13 +30,21 @@ const useSpeechToText = (onTranscript: (text: string) => void) => {
       recognitionRef.current.interimResults = false;
 
       recognitionRef.current.onresult = (event: any) => {
+        // console.log('Speech result:', event);
         const transcript = event.results[0][0].transcript;
-        onTranscript(transcript);
+        if (transcript) {
+          onTranscript(transcript);
+        }
         setIsListening(false);
       };
 
       recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error', event.error);
+        console.error('Speech recognition error details:', event);
+        if (event.error === 'no-speech') {
+          // Ignore no-speech error, just stop listening
+        } else {
+          alert(`Error: ${event.error}`);
+        }
         setIsListening(false);
       };
 
@@ -50,8 +58,13 @@ const useSpeechToText = (onTranscript: (text: string) => void) => {
 
   const startListening = () => {
     if (recognitionRef.current) {
-      setIsListening(true);
-      recognitionRef.current.start();
+      try {
+        setIsListening(true);
+        recognitionRef.current.start();
+      } catch (e) {
+        console.error("Failed to start recognition:", e);
+        setIsListening(false);
+      }
     } else {
       alert('Speech recognition not supported in this browser. Please use Chrome, Edge, or Safari, or type your message below.');
     }
