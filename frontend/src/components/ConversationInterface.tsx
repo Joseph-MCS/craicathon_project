@@ -114,9 +114,42 @@ export default function ConversationInterface() {
   const { isListening, isSupported, startListening, stopListening } = useSpeechToText(handleUserMessage);
   const { isPlaying, speak } = useTextToSpeech();
 
+  // Simple English detection heuristic
+  const looksLikeEnglish = (text: string): boolean => {
+    const commonEnglishWords = [
+      'the', 'and', 'hello', 'what', 'where', 'why', 'who', 'how', 'sorry', 
+      'please', 'thanks', 'thank', 'good', 'morning', 'night', 'yes', 'english',
+      'speak', 'can', 'you', 'help', 'me', 'stop'
+    ];
+    
+    const words = text.toLowerCase().replace(/[.,!?]/g, '').split(/\s+/);
+    // Check if any significant English words are present
+    const englishWordCount = words.filter(w => commonEnglishWords.includes(w)).length;
+    
+    // If more than 20% of the words are clearly English, or if it's a short English phrase
+    return englishWordCount > 0 && (englishWordCount / words.length > 0.2 || words.length < 3);
+  };
+
   async function handleUserMessage(text: string) {
     const newMessage: Message = { id: Date.now().toString(), sender: 'user', text };
     setMessages(prev => [...prev, newMessage]);
+
+    // Check if user is speaking English
+    if (looksLikeEnglish(text)) {
+      const scoldMessage = "Ní thuigim Béarla! Labhair Gaeilge, le do thoil. (I don't understand English! Speak Irish please.)";
+      const aiMessage: Message = { 
+        id: (Date.now() + 1).toString(), 
+        sender: 'ai', 
+        text: scoldMessage 
+      };
+      
+      // Artificial delay to feel like processing
+      setTimeout(() => {
+        setMessages(prev => [...prev, aiMessage]);
+        speak(scoldMessage.split('(')[0]); // Only speak the Irish part
+      }, 500);
+      return; // Stop processing
+    }
 
     // Check grammar
     try {
