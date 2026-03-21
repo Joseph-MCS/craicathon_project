@@ -112,7 +112,7 @@ export default function ConversationInterface() {
   const [corrections, setCorrections] = useState<GrammarCorrection[]>([]);
   const [inputText, setInputText] = useState('');
   const { isListening, isSupported, startListening, stopListening } = useSpeechToText(handleUserMessage);
-  const { isPlaying, speak } = useTextToSpeech();
+  const { speak } = useTextToSpeech();
 
   // Simple English detection heuristic
   const looksLikeEnglish = (text: string): boolean => {
