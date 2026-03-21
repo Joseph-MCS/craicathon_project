@@ -127,7 +127,31 @@ button:focus-visible {
   text-align: center;
 }
 
-.listening {
+.status-indicator {
+  height: 30px;
+  margin-bottom: 1rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.badge.irish {
+  background-color: #2ed573;
+  color: #1e272e;
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(46, 213, 115, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(46, 213, 115, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(46, 213, 115, 0); }
+}
+
   background-color: #ff4757;
   animation: pulse 1.5s infinite;
 }
