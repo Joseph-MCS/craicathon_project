@@ -18,6 +18,7 @@ interface GrammarCorrection {
 // Hooks (Inlined for single file, should be separate)
 const useSpeechToText = (onTranscript: (text: string) => void) => {
   const [isListening, setIsListening] = useState(false);
+  const [isSupported, setIsSupported] = useState(true);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -42,6 +43,8 @@ const useSpeechToText = (onTranscript: (text: string) => void) => {
       recognitionRef.current.onend = () => {
         setIsListening(false);
       };
+    } else {
+      setIsSupported(false);
     }
   }, [onTranscript]);
 
@@ -50,7 +53,7 @@ const useSpeechToText = (onTranscript: (text: string) => void) => {
       setIsListening(true);
       recognitionRef.current.start();
     } else {
-      alert('Speech recognition not supported in this browser.');
+      alert('Speech recognition not supported in this browser. Please use Chrome, Edge, or Safari, or type your message below.');
     }
   };
 
@@ -61,7 +64,7 @@ const useSpeechToText = (onTranscript: (text: string) => void) => {
     }
   };
 
-  return { isListening, startListening, stopListening };
+  return { isListening, isSupported, startListening, stopListening };
 };
 
 const useTextToSpeech = () => {
@@ -94,7 +97,8 @@ const useTextToSpeech = () => {
 export default function ConversationInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [corrections, setCorrections] = useState<GrammarCorrection[]>([]);
-  const { isListening, startListening, stopListening } = useSpeechToText(handleUserMessage);
+  const [inputText, setInputText] = useState('');
+  const { isListening, isSupported, startListening, stopListening } = useSpeechToText(handleUserMessage);
   const { isPlaying, speak } = useTextToSpeech();
 
   async function handleUserMessage(text: string) {
@@ -118,6 +122,14 @@ export default function ConversationInterface() {
     } catch (e) { console.error(e); }
   }
 
+  const handleTextSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inputText.trim()) {
+      handleUserMessage(inputText);
+      setInputText('');
+    }
+  };
+
   return (
     <div className="conversation-container">
       <header>
@@ -126,6 +138,12 @@ export default function ConversationInterface() {
       
       <div className="main-content">
         <div className="chat-area">
+          {messages.length === 0 && (
+            <div className="empty-state">
+              <p>Dia duit! Start a conversation in Irish.</p>
+              {!isSupported && <p className="warning">⚠️ Speech recognition is not supported in this browser. Please use Chrome/Edge or type below.</p>}
+            </div>
+          )}
           {messages.map(msg => (
             <div key={msg.id} className={`message ${msg.sender}`}>
               <p>{msg.text}</p>
@@ -147,12 +165,27 @@ export default function ConversationInterface() {
       </div>
 
       <div className="controls">
-        <button 
-          onClick={isListening ? stopListening : startListening}
-          className={isListening ? 'listening' : ''}
-        >
-          {isListening ? 'Listening...' : 'Speak Irish'}
-        </button>
+        {isSupported && (
+          <button 
+            onClick={isListening ? stopListening : startListening}
+            className={isListening ? 'listening' : ''}
+          >
+            {isListening ? 'Listening...' : 'Speak Irish'}
+          </button>
+        )}
+        
+        <form onSubmit={handleTextSubmit} className="text-input-form">
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Type Irish here..."
+            disabled={isListening}
+          />
+          <button type="submit" disabled={!inputText.trim() || isListening}>
+            Send
+          </button>
+        </form>
       </div>
     </div>
   );
