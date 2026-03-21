@@ -12,10 +12,18 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_API_BASE = 'https://api.openai.com/v1';
 const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-5-mini';
 const TRANSCRIPTION_MODEL = process.env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-4o-transcribe';
+const TTS_PROVIDER = (process.env.TTS_PROVIDER || 'abair').trim().toLowerCase() === 'openai' ? 'openai' : 'abair';
 const TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
 const TTS_VOICE = process.env.OPENAI_TTS_VOICE || 'coral';
+const ABAIR_API_BASE = process.env.ABAIR_API_BASE || 'https://api.abair.ie/v3';
+const ABAIR_LANGUAGE_CODE = process.env.ABAIR_LANGUAGE_CODE || 'ga-IE';
+const ABAIR_VOICE = process.env.ABAIR_VOICE || 'ga_UL_anb_piper';
+const ABAIR_AUDIO_ENCODING = process.env.ABAIR_AUDIO_ENCODING || 'MP3';
+const ABAIR_SPEAKING_RATE = Number(process.env.ABAIR_SPEAKING_RATE || 1);
+const ABAIR_PITCH = Number(process.env.ABAIR_PITCH || 1);
+const ABAIR_VOLUME_GAIN_DB = Number(process.env.ABAIR_VOLUME_GAIN_DB || 1);
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
-const VOICE_DISCLOSURE = 'The spoken reply uses an AI-generated voice.';
+const VOICE_DISCLOSURE = 'The spoken reply uses a synthetic voice.';
 const IRISH_TUTOR_INSTRUCTIONS = [
   'You are a warm Irish-language conversation partner for learners.',
   'Always reply entirely in Irish.',
@@ -64,6 +72,14 @@ type OpenAIResponsePayload = OpenAIErrorPayload & {
   output_text?: string;
 };
 
+type AbairErrorPayload = {
+  error?: string;
+};
+
+type AbairSynthesisPayload = AbairErrorPayload & {
+  audioContent?: string;
+};
+
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
@@ -96,7 +112,7 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return 'Something went wrong while talking to OpenAI.';
+  return 'Something went wrong while processing the request.';
 }
 
 function extractOpenAIError(payload: unknown): string {
@@ -123,6 +139,18 @@ function readResponseText(payload: OpenAIResponsePayload): string {
       .filter((part) => part.length > 0) ?? [];
 
   return fragments.join('\n').trim();
+}
+
+function extractAbairError(payload: unknown): string {
+  if (typeof payload === 'object' && payload !== null) {
+    const error = (payload as AbairErrorPayload).error;
+
+    if (typeof error === 'string' && error.trim().length > 0) {
+      return error;
+    }
+  }
+
+  return 'ABAIR request failed.';
 }
 
 function extensionFromMimeType(mimeType: string): string {
@@ -264,7 +292,7 @@ async function generateIrishReply(message: string, history: ClientMessage[]): Pr
   return reply;
 }
 
-async function synthesizeIrishReply(text: string): Promise<{ audioBase64: string; audioMimeType: string }> {
+async function synthesizeOpenAIReply(text: string): Promise<{ audioBase64: string; audioMimeType: string }> {
   ensureConfigured();
 
   const response = await fetch(`${OPENAI_API_BASE}/audio/speech`, {
@@ -295,14 +323,66 @@ async function synthesizeIrishReply(text: string): Promise<{ audioBase64: string
   };
 }
 
+async function synthesizeAbairReply(text: string): Promise<{ audioBase64: string; audioMimeType: string }> {
+  const response = await fetch(`${ABAIR_API_BASE}/synthesis`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      synthinput: {
+        text
+      },
+      voiceparams: {
+        languageCode: ABAIR_LANGUAGE_CODE,
+        name: ABAIR_VOICE,
+        ssmlGender: 'UNSPECIFIED'
+      },
+      audioconfig: {
+        audioEncoding: ABAIR_AUDIO_ENCODING,
+        speakingRate: ABAIR_SPEAKING_RATE,
+        pitch: ABAIR_PITCH,
+        volumeGainDb: ABAIR_VOLUME_GAIN_DB
+      },
+      outputType: 'JSON'
+    })
+  });
+
+  const payload = (await response.json().catch(() => null)) as AbairSynthesisPayload | null;
+
+  if (!response.ok) {
+    throw new Error(extractAbairError(payload));
+  }
+
+  const audioBase64 = payload?.audioContent?.trim();
+
+  if (!audioBase64) {
+    throw new Error('ABAIR returned an empty audio response.');
+  }
+
+  return {
+    audioBase64,
+    audioMimeType: 'audio/mpeg'
+  };
+}
+
+async function synthesizeIrishReply(text: string): Promise<{ audioBase64: string; audioMimeType: string }> {
+  if (TTS_PROVIDER === 'openai') {
+    return synthesizeOpenAIReply(text);
+  }
+
+  return synthesizeAbairReply(text);
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({
     configured: Boolean(OPENAI_API_KEY),
     models: {
       chat: CHAT_MODEL,
       transcription: TRANSCRIPTION_MODEL,
-      tts: TTS_MODEL,
-      voice: TTS_VOICE
+      tts: TTS_PROVIDER === 'openai' ? TTS_MODEL : 'abair',
+      ttsProvider: TTS_PROVIDER,
+      voice: TTS_PROVIDER === 'openai' ? TTS_VOICE : ABAIR_VOICE
     },
     voiceDisclosure: VOICE_DISCLOSURE
   });

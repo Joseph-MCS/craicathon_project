@@ -22,6 +22,7 @@ type HealthResponse = {
     chat: string;
     transcription: string;
     tts: string;
+    ttsProvider?: string;
     voice: string;
   };
   voiceDisclosure: string;
@@ -359,7 +360,7 @@ export default function ConversationInterface() {
       return;
     }
 
-    setStatusText('Sending your Irish to OpenAI...');
+    setStatusText('Sending your Irish...');
     recorderRef.current.stop();
   }
 
@@ -392,7 +393,7 @@ export default function ConversationInterface() {
 
         <div className="signal-row">
           <span className={`pill ${health?.configured ? 'pill-ready' : 'pill-warn'}`}>
-            {health?.configured ? 'OpenAI key found' : 'Backend not configured'}
+            {health?.configured ? 'Backend ready' : 'Backend not configured'}
           </span>
           <span className={`pill ${isRecording ? 'pill-recording' : 'pill-calm'}`}>{readyLabel}</span>
         </div>
@@ -480,7 +481,7 @@ export default function ConversationInterface() {
               <div>
                 <dt>Speech</dt>
                 <dd>
-                  {health?.models.tts ?? 'Checking...'} / {health?.models.voice ?? '...'}
+                  {health?.models.ttsProvider ?? health?.models.tts ?? 'Checking...'} / {health?.models.voice ?? '...'}
                 </dd>
               </div>
             </dl>

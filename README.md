@@ -1,6 +1,6 @@
 # Craicathon 2026 - Irish Voice Chat
 
-A small full-stack app for speaking Irish into your browser, transcribing it with OpenAI, showing the transcript in chat, generating a reply in Irish, and speaking that reply back with OpenAI text-to-speech.
+A small full-stack app for speaking Irish into your browser, transcribing it with OpenAI, showing the transcript in chat, generating a reply in Irish, and speaking that reply back with ABAIR text-to-speech by default.
 
 ## Prerequisites
 
@@ -17,6 +17,10 @@ OPENAI_API_KEY=your_key_here
 PORT=3001
 OPENAI_CHAT_MODEL=gpt-5-mini
 OPENAI_TRANSCRIPTION_MODEL=gpt-4o-transcribe
+TTS_PROVIDER=abair
+ABAIR_VOICE=ga_UL_anb_piper
+
+# Optional: switch back to OpenAI speech if you want
 OPENAI_TTS_MODEL=gpt-4o-mini-tts
 OPENAI_TTS_VOICE=coral
 ```
@@ -69,5 +73,6 @@ The backend serves the built frontend automatically when `frontend/dist` exists.
 
 - The browser app uses the microphone through `MediaRecorder`, so mic permission is required.
 - Keep recordings short for the best local experience.
-- The spoken reply is AI-generated and should be disclosed as such to end users.
+- The spoken reply is synthetic and should be disclosed as such to end users.
 - Irish quality should be treated as something to validate with real usage and sample audio.
+- Change `ABAIR_VOICE` in `.env` to try other ABAIR voices without changing code.
