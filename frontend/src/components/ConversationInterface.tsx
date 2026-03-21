@@ -59,8 +59,11 @@ const useSpeechToText = (onTranscript: (text: string) => void) => {
   const startListening = () => {
     if (recognitionRef.current) {
       try {
+        // Force language to Irish every time we start
+        recognitionRef.current.lang = 'ga-IE';
         setIsListening(true);
         recognitionRef.current.start();
+        console.log('Started listening with language:', recognitionRef.current.lang);
       } catch (e) {
         console.error("Failed to start recognition:", e);
         setIsListening(false);
@@ -136,7 +139,8 @@ export default function ConversationInterface() {
 
     // Check if user is speaking English
     if (looksLikeEnglish(text)) {
-      const scoldMessage = "Ní thuigim Béarla! Labhair Gaeilge, le do thoil. (I don't understand English! Speak Irish please.)";
+      console.log("English detected in:", text);
+      const scoldMessage = `I heard: "${text}". Ní thuigim Béarla! Labhair Gaeilge, le do thoil.`;
       const aiMessage: Message = { 
         id: (Date.now() + 1).toString(), 
         sender: 'ai', 
@@ -146,7 +150,7 @@ export default function ConversationInterface() {
       // Artificial delay to feel like processing
       setTimeout(() => {
         setMessages(prev => [...prev, aiMessage]);
-        speak(scoldMessage.split('(')[0]); // Only speak the Irish part
+        speak("Ní thuigim Béarla! Labhair Gaeilge, le do thoil."); // Only speak the Irish part
       }, 500);
       return; // Stop processing
     }
@@ -211,6 +215,10 @@ export default function ConversationInterface() {
       </div>
 
       <div className="controls">
+        <div className="status-indicator">
+          {isListening && <span className="badge irish">🎤 Listening in Irish (ga-IE)</span>}
+        </div>
+
         {isSupported && (
           <button 
             onClick={isListening ? stopListening : startListening}
