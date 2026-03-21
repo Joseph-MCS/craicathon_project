@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import ConversationInterface from './components/ConversationInterface';
 import IrishSideQuest from './components/IrishSideQuest';
+import PintDashQuest from './components/PintDashQuest';
 
 type View =
   | 'landing'
   | 'core'
   | 'quests-hub'
   | 'quest-cards'
-  | 'quest-phrase-rescue'
-  | 'quest-story-trail';
+  | 'quest-pint-dash';
 
 function App() {
   const [view, setView] = useState<View>('landing');
@@ -63,14 +63,9 @@ function App() {
               <span>Collect cards, unlock notes, and run mini quizzes.</span>
             </button>
 
-            <button className="quest-button" onClick={() => setView('quest-phrase-rescue')}>
-              <strong>Phrase Rescue</strong>
-              <span>Repair broken Irish sentences against the clock.</span>
-            </button>
-
-            <button className="quest-button" onClick={() => setView('quest-story-trail')}>
-              <strong>Story Trail</strong>
-              <span>Choose responses and shape a short Irish adventure.</span>
+            <button className="quest-button" onClick={() => setView('quest-pint-dash')}>
+              <strong>Pint Dash</strong>
+              <span>Run an Irish pub shift with hints, matching, and quick serving.</span>
             </button>
           </div>
         </section>
@@ -91,25 +86,7 @@ function App() {
 
       {view === 'quest-cards' && <IrishSideQuest />}
 
-      {view === 'quest-phrase-rescue' && (
-        <section className="quest-placeholder">
-          <h1>Phrase Rescue</h1>
-          <p>
-            This quest is queued next. You will fix grammar and phrase order in
-            short Irish prompts for points.
-          </p>
-        </section>
-      )}
-
-      {view === 'quest-story-trail' && (
-        <section className="quest-placeholder">
-          <h1>Story Trail</h1>
-          <p>
-            This quest is queued next. You will choose Irish responses that
-            unlock different story endings.
-          </p>
-        </section>
-      )}
+      {view === 'quest-pint-dash' && <PintDashQuest />}
     </div>
   );
 }
