@@ -74,7 +74,10 @@ const RECORDER_MIME_TYPES = [
 ];
 const MESSAGE_TOKEN_REGEX = /[\p{L}\p{M}]+(?:['’\-][\p{L}\p{M}]+)*|\s+|[^\s\p{L}\p{M}]+/gu;
 const IRISH_WORD_REGEX = /^[\p{L}\p{M}]+(?:['’\-][\p{L}\p{M}]+)*$/u;
-const WELCOME_COPY = 'Dia duit. Labhair liom as Gaeilge agus freagróidh mé duit i nGaeilge, le guth AI.';
+const SESSION_MIN_SPEECH_MS = 140;
+const SESSION_SILENCE_MS = 900;
+const SESSION_VOLUME_THRESHOLD = 0.035;
+const WELCOME_COPY = 'Dia duit. Nuair a thosaíonn tú an seisiún, éistfidh mé leat go leanúnach agus freagróidh mé duit i nGaeilge.';
 
 function createMessage(role: ChatRole, text: string, mode: InputMode): Message {
   return {
@@ -97,6 +100,19 @@ function pickRecorderMimeType(): string | null {
   }
 
   return '';
+}
+
+function getAudioContextConstructor(): typeof AudioContext | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const audioWindow = window as Window &
+    typeof globalThis & {
+      webkitAudioContext?: typeof AudioContext;
+    };
+
+  return audioWindow.AudioContext ?? audioWindow.webkitAudioContext ?? null;
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -137,9 +153,10 @@ function buildGlossCacheKey(word: string, context: string): string {
 
 export default function ConversationInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isCapturingSpeech, setIsCapturingSpeech] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
-  const [statusText, setStatusText] = useState('Tapáil an mic, labhair i nGaeilge, agus freagróidh mé os ard.');
+  const [statusText, setStatusText] = useState('Tapáil Tosaigh chun comhrá beo a thosú.');
   const [errorText, setErrorText] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [canRecord, setCanRecord] = useState(false);
@@ -147,22 +164,42 @@ export default function ConversationInterface() {
   const [glossCache, setGlossCache] = useState<Record<string, WordGlossCacheEntry>>({});
   const [activeGloss, setActiveGloss] = useState<ActiveGloss | null>(null);
   const messagesRef = useRef<Message[]>([]);
+  const glossCacheRef = useRef<Record<string, WordGlossCacheEntry>>({});
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const recorderMimeTypeRef = useRef('');
   const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const monitorFrameRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const glossHoverTimerRef = useRef<number | null>(null);
+  const sessionCycleRef = useRef(0);
+  const activeRequestCycleRef = useRef<number | null>(null);
+  const isSessionActiveRef = useRef(false);
+  const isCapturingSpeechRef = useRef(false);
+  const isBusyRef = useRef(false);
+  const isSpeakingRef = useRef(false);
+  const discardCurrentRecordingRef = useRef(false);
+  const speechDetectedAtRef = useRef<number | null>(null);
+  const silenceDetectedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
   useEffect(() => {
+    glossCacheRef.current = glossCache;
+  }, [glossCache]);
+
+  useEffect(() => {
     setCanRecord(
       typeof window !== 'undefined' &&
         typeof MediaRecorder !== 'undefined' &&
-        Boolean(navigator.mediaDevices?.getUserMedia)
+        Boolean(navigator.mediaDevices?.getUserMedia) &&
+        Boolean(getAudioContextConstructor())
     );
   }, []);
 
@@ -175,25 +212,86 @@ export default function ConversationInterface() {
 
     return () => {
       clearGlossHoverTimer();
+      teardownConversationSession(true);
 
       if (audioRef.current) {
         audioRef.current.pause();
       }
-
-      stopStreamTracks();
     };
   }, []);
-
-  function stopStreamTracks() {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-  }
 
   function clearGlossHoverTimer() {
     if (glossHoverTimerRef.current !== null && typeof window !== 'undefined') {
       window.clearTimeout(glossHoverTimerRef.current);
       glossHoverTimerRef.current = null;
     }
+  }
+
+  function resetSpeechTracking() {
+    speechDetectedAtRef.current = null;
+    silenceDetectedAtRef.current = null;
+  }
+
+  function stopStreamTracks() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }
+
+  function stopAudioMonitoring() {
+    if (monitorFrameRef.current !== null && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(monitorFrameRef.current);
+      monitorFrameRef.current = null;
+    }
+
+    if (sourceNodeRef.current) {
+      sourceNodeRef.current.disconnect();
+      sourceNodeRef.current = null;
+    }
+
+    analyserRef.current = null;
+
+    if (audioContextRef.current) {
+      void audioContextRef.current.close().catch(() => undefined);
+      audioContextRef.current = null;
+    }
+  }
+
+  function teardownConversationSession(silent = false) {
+    sessionCycleRef.current += 1;
+    activeRequestCycleRef.current = null;
+    isSessionActiveRef.current = false;
+    isCapturingSpeechRef.current = false;
+    isBusyRef.current = false;
+    isSpeakingRef.current = false;
+    resetSpeechTracking();
+
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      discardCurrentRecordingRef.current = true;
+      recorderRef.current.stop();
+    }
+
+    setIsSessionActive(false);
+    setIsCapturingSpeech(false);
+    setIsBusy(false);
+    stopAudioMonitoring();
+    stopStreamTracks();
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    if (!silent) {
+      setStatusText('Seisiún stoptha. Tapáil Tosaigh nuair atá tú réidh arís.');
+    }
+  }
+
+  function buildHistory(): HistoryMessage[] {
+    return messagesRef.current.slice(-10).map((message) => ({
+      mode: message.mode,
+      role: message.role,
+      text: message.text
+    }));
   }
 
   async function loadHealth() {
@@ -211,16 +309,9 @@ export default function ConversationInterface() {
     }
   }
 
-  function buildHistory(): HistoryMessage[] {
-    return messagesRef.current.slice(-10).map((message) => ({
-      mode: message.mode,
-      role: message.role,
-      text: message.text
-    }));
-  }
-
   async function playAudio(base64: string, mimeType: string) {
     setLastAudio({ base64, mimeType });
+    isSpeakingRef.current = true;
 
     if (audioRef.current) {
       audioRef.current.pause();
@@ -231,11 +322,19 @@ export default function ConversationInterface() {
     audioRef.current = audio;
 
     audio.onended = () => {
-      setStatusText('Réidh don chéad abairt eile.');
+      isSpeakingRef.current = false;
+      setStatusText(
+        isSessionActiveRef.current ? 'Seisiún beo. Labhair nuair atá tú réidh arís.' : 'Réidh don chéad bhabhta eile.'
+      );
     };
 
     audio.onerror = () => {
-      setStatusText('The reply is ready. Tap replay if autoplay was blocked.');
+      isSpeakingRef.current = false;
+      setStatusText(
+        isSessionActiveRef.current
+          ? 'Tá an freagra réidh. Seinn arís más gá, agus lean ort ag labhairt.'
+          : 'Tá an freagra réidh. Tapáil Seinn arís chun éisteacht.'
+      );
     };
 
     try {
@@ -243,17 +342,25 @@ export default function ConversationInterface() {
       setStatusText('Ag caint anois...');
     } catch (error) {
       console.error(error);
-      setStatusText('The reply is ready. Tap replay to hear it.');
+      isSpeakingRef.current = false;
+      setStatusText(
+        isSessionActiveRef.current
+          ? 'Freagra réidh. Tapáil Seinn arís más gá, agus lean ort leis an gcomhrá.'
+          : 'Freagra réidh. Tapáil Seinn arís chun éisteacht.'
+      );
     }
   }
 
-  async function sendVoiceMessage(blob: Blob) {
+  async function sendVoiceMessage(blob: Blob, sessionCycle: number) {
     const mimeType = blob.type || 'audio/webm';
     const history = buildHistory();
+    const requestSessionCycle = sessionCycle;
 
     setErrorText(null);
+    activeRequestCycleRef.current = requestSessionCycle;
+    isBusyRef.current = true;
     setIsBusy(true);
-    setStatusText('Transcribing your Irish...');
+    setStatusText('Ag tras-scríobh do chuid Gaeilge...');
 
     try {
       const audioBase64 = await blobToBase64(blob);
@@ -274,6 +381,10 @@ export default function ConversationInterface() {
         throw new Error(typeof payload === 'object' && payload && 'error' in payload ? payload.error : 'Voice chat failed.');
       }
 
+      if (requestSessionCycle !== sessionCycleRef.current) {
+        return;
+      }
+
       const successPayload = payload as VoiceChatResponse;
       const userMessage = createMessage('user', successPayload.transcript, 'voice');
       const assistantMessage = createMessage('assistant', successPayload.reply, 'voice');
@@ -283,15 +394,137 @@ export default function ConversationInterface() {
       await playAudio(successPayload.audioBase64, successPayload.audioMimeType);
     } catch (error) {
       console.error(error);
-      setErrorText(error instanceof Error ? error.message : 'Voice chat failed.');
-      setStatusText('Something went wrong. Try a shorter Irish clip.');
+
+      if (requestSessionCycle === sessionCycleRef.current) {
+        setErrorText(error instanceof Error ? error.message : 'Voice chat failed.');
+        setStatusText('Theip ar an gcomhrá beo. Bain triail eile as le frása níos giorra.');
+      }
     } finally {
-      setIsBusy(false);
+      if (activeRequestCycleRef.current === requestSessionCycle) {
+        activeRequestCycleRef.current = null;
+        isBusyRef.current = false;
+        setIsBusy(false);
+      }
     }
   }
 
-  async function startRecording() {
-    if (isBusy || isRecording) {
+  function stopSegmentRecording(discard = false) {
+    if (!recorderRef.current || recorderRef.current.state === 'inactive') {
+      return;
+    }
+
+    discardCurrentRecordingRef.current = discard;
+    recorderRef.current.stop();
+  }
+
+  function beginSegmentRecording() {
+    if (!streamRef.current || isCapturingSpeechRef.current || isBusyRef.current || isSpeakingRef.current) {
+      return;
+    }
+
+    const mimeType = recorderMimeTypeRef.current;
+    const recorder = mimeType ? new MediaRecorder(streamRef.current, { mimeType }) : new MediaRecorder(streamRef.current);
+
+    recorderRef.current = recorder;
+    chunksRef.current = [];
+    discardCurrentRecordingRef.current = false;
+    isCapturingSpeechRef.current = true;
+    setIsCapturingSpeech(true);
+    setStatusText('Táim ag éisteacht leat anois...');
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunksRef.current.push(event.data);
+      }
+    };
+
+    recorder.onerror = () => {
+      recorderRef.current = null;
+      chunksRef.current = [];
+      discardCurrentRecordingRef.current = false;
+      isCapturingSpeechRef.current = false;
+      setIsCapturingSpeech(false);
+      setErrorText('The live listening session hit a recording problem. Stop and start again.');
+      setStatusText('Bhí fadhb leis an taifeadadh beo. Stop agus tosaigh arís.');
+    };
+
+    recorder.onstop = async () => {
+      const shouldDiscard = discardCurrentRecordingRef.current;
+      const finalMimeType = recorder.mimeType || mimeType || 'audio/webm';
+      const audioBlob = new Blob(chunksRef.current, { type: finalMimeType });
+
+      recorderRef.current = null;
+      chunksRef.current = [];
+      discardCurrentRecordingRef.current = false;
+      isCapturingSpeechRef.current = false;
+      setIsCapturingSpeech(false);
+      resetSpeechTracking();
+
+      if (shouldDiscard || audioBlob.size === 0) {
+        if (isSessionActiveRef.current) {
+          setStatusText('Seisiún beo. Labhair nuair atá tú réidh arís.');
+        }
+        return;
+      }
+
+      await sendVoiceMessage(audioBlob, sessionCycleRef.current);
+    };
+
+    recorder.start();
+  }
+
+  function monitorConversationSession() {
+    if (typeof window === 'undefined' || !isSessionActiveRef.current || !analyserRef.current) {
+      return;
+    }
+
+    const analyser = analyserRef.current;
+    const samples = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(samples);
+
+    let sumSquares = 0;
+
+    for (const sample of samples) {
+      const normalizedSample = (sample - 128) / 128;
+      sumSquares += normalizedSample * normalizedSample;
+    }
+
+    const rms = Math.sqrt(sumSquares / samples.length);
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+    if (isBusyRef.current || isSpeakingRef.current) {
+      resetSpeechTracking();
+    } else if (rms >= SESSION_VOLUME_THRESHOLD) {
+      silenceDetectedAtRef.current = null;
+
+      if (!isCapturingSpeechRef.current) {
+        if (speechDetectedAtRef.current === null) {
+          speechDetectedAtRef.current = now;
+        }
+
+        if (now - speechDetectedAtRef.current >= SESSION_MIN_SPEECH_MS) {
+          beginSegmentRecording();
+        }
+      }
+    } else {
+      speechDetectedAtRef.current = null;
+
+      if (isCapturingSpeechRef.current) {
+        if (silenceDetectedAtRef.current === null) {
+          silenceDetectedAtRef.current = now;
+        }
+
+        if (now - silenceDetectedAtRef.current >= SESSION_SILENCE_MS) {
+          stopSegmentRecording(false);
+        }
+      }
+    }
+
+    monitorFrameRef.current = window.requestAnimationFrame(monitorConversationSession);
+  }
+
+  async function startConversationSession() {
+    if (isSessionActiveRef.current || isBusyRef.current) {
       return;
     }
 
@@ -303,65 +536,59 @@ export default function ConversationInterface() {
     const supportedMimeType = pickRecorderMimeType();
 
     if (supportedMimeType === null) {
-      setErrorText('This browser does not support microphone recording for this app.');
+      setErrorText('This browser does not support the always-on voice mode used by the app.');
+      return;
+    }
+
+    const AudioContextConstructor = getAudioContextConstructor();
+
+    if (!AudioContextConstructor) {
+      setErrorText('This browser does not support live microphone monitoring for the always-on mode.');
       return;
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = supportedMimeType
-        ? new MediaRecorder(stream, { mimeType: supportedMimeType })
-        : new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
+      const audioContext = new AudioContextConstructor();
+      const sourceNode = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.82;
+      sourceNode.connect(analyser);
+
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume().catch(() => undefined);
+      }
 
       streamRef.current = stream;
-      recorderRef.current = recorder;
-      chunksRef.current = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onstop = async () => {
-        const finalMimeType = recorder.mimeType || supportedMimeType || 'audio/webm';
-        const audioBlob = new Blob(chunksRef.current, { type: finalMimeType });
-
-        setIsRecording(false);
-        recorderRef.current = null;
-        stopStreamTracks();
-
-        if (audioBlob.size === 0) {
-          setStatusText('No audio captured. Try again and speak for a moment.');
-          return;
-        }
-
-        await sendVoiceMessage(audioBlob);
-      };
-
-      recorder.onerror = () => {
-        setIsRecording(false);
-        stopStreamTracks();
-        setErrorText('Recording failed. Please refresh and try again.');
-      };
-
-      recorder.start();
-      setIsRecording(true);
+      audioContextRef.current = audioContext;
+      sourceNodeRef.current = sourceNode;
+      analyserRef.current = analyser;
+      recorderMimeTypeRef.current = supportedMimeType;
+      sessionCycleRef.current += 1;
+      isSessionActiveRef.current = true;
+      setIsSessionActive(true);
       setErrorText(null);
-      setStatusText('Listening now. Speak Irish, then tap stop.');
+      setStatusText('Seisiún beo. Labhair go nádúrtha agus freagróidh mé go huathoibríoch.');
+
+      monitorConversationSession();
     } catch (error) {
       console.error(error);
+      teardownConversationSession(true);
       setErrorText('Microphone access was denied or unavailable.');
+      setStatusText('Níor éirigh liom an seisiún beo a thosú.');
     }
   }
 
-  function stopRecording() {
-    if (!recorderRef.current || recorderRef.current.state === 'inactive') {
-      return;
-    }
-
-    setStatusText('Sending your Irish...');
-    recorderRef.current.stop();
+  function stopConversationSession() {
+    teardownConversationSession(false);
   }
 
   async function replayLastAudio() {
@@ -373,7 +600,7 @@ export default function ConversationInterface() {
   }
 
   async function loadGloss(word: string, context: string, cacheKey: string) {
-    const existingEntry = glossCache[cacheKey];
+    const existingEntry = glossCacheRef.current[cacheKey];
 
     if (existingEntry?.status === 'loading' || existingEntry?.status === 'ready') {
       return;
@@ -508,6 +735,12 @@ export default function ConversationInterface() {
             aria-label={`Show help for ${token}`}
             className={`gloss-word ${isActive ? 'is-active' : ''}`}
             onClick={() => activateGloss(token, message.text, message.id, tokenIndex, true)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                activateGloss(token, message.text, message.id, tokenIndex, true);
+              }
+            }}
             role="button"
             tabIndex={0}
           >
@@ -526,9 +759,9 @@ export default function ConversationInterface() {
           <p className="eyebrow">Comrádaí gutha Gaeilge</p>
           <h1>Labhair Linn</h1>
           <p className="lede">
-            Labhair isteach sa mhicreafón. Déanann an aip tras-scríobh ar do
-            chuid Gaeilge, cuireann sí isteach sa chomhrá í, scríobhann sí
-            freagra i nGaeilge, agus labhraíonn sí leat ar ais.
+            Tosaigh an seisiún uair amháin, labhair go nádúrtha, agus fanfaidh
+            an comhrá beo. Nuair a stopann tú ag caint, freagróidh an aip leat
+            go huathoibríoch.
           </p>
         </div>
       </section>
@@ -540,16 +773,13 @@ export default function ConversationInterface() {
               <h2>Comhrá</h2>
               <p>{statusText}</p>
             </div>
-            <button className="secondary-button" onClick={() => void replayLastAudio()} disabled={!lastAudio || isBusy}>
-              Seinn arís
-            </button>
           </div>
 
           <div className="chat-scroll">
             {messages.length === 0 ? (
               <div className="empty-state">
                 <p>{WELCOME_COPY}</p>
-                <p>Is fearr a oibríonn sé le gearrthóga gearra agus fuaimniú soiléir.</p>
+                <p>Moltar cluasáin a úsáid chun macalla idir do ghuth agus freagra an aip a laghdú.</p>
               </div>
             ) : (
               messages.map((message) => (
@@ -565,17 +795,26 @@ export default function ConversationInterface() {
           <div className="composer-panel">
             <div className="voice-controls">
               <button
-                className={`record-button ${isRecording ? 'is-active' : ''}`}
-                disabled={!canRecord || isBusy || !health?.configured}
-                onClick={() => void (isRecording ? stopRecording() : startRecording())}
+                className={`record-button session-button ${isSessionActive ? 'is-stop' : 'is-start'} ${
+                  isCapturingSpeech ? 'is-live' : ''
+                }`}
+                disabled={!isSessionActive && (!canRecord || isBusy || !health?.configured)}
+                onClick={() => void (isSessionActive ? stopConversationSession() : startConversationSession())}
                 type="button"
               >
-                {isRecording ? 'Stad' : 'Labhair anois'}
+                {isSessionActive ? 'Stop' : 'Tosaigh'}
               </button>
+
+              {lastAudio ? (
+                <button className="secondary-button" disabled={isBusy} onClick={() => void replayLastAudio()} type="button">
+                  Seinn arís
+                </button>
+              ) : null}
+
               <p className="hint">
                 {canRecord
-                  ? 'Taifead abairt ghearr i nGaeilge, agus ansin cuir an luch thar fhocail sa chomhrá chun aistriúchán agus canúintí a fheiceáil.'
-                  : 'Ní thacaíonn an brabhsálaí seo leis an sreabhadh taifeadta a úsáideann an aip.'}
+                  ? 'Nuair atá an seisiún beo, éisteann an aip le sosanna nádúrtha, cuireann sí do chuid focal sa chomhrá, agus freagraíonn sí ar ais gan cnaipe eile.'
+                  : 'Ní thacaíonn an brabhsálaí seo leis an modh comhrá beo a úsáideann an aip.'}
               </p>
             </div>
           </div>

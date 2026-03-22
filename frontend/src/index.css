@@ -688,12 +688,34 @@ input:focus-visible {
   text-transform: uppercase;
 }
 
+.session-button {
+  width: min(100%, 19rem);
+  min-height: 74px;
+  font-size: 1.18rem;
+  letter-spacing: 0.04em;
+}
+
+.session-button.is-start {
+  background: linear-gradient(135deg, var(--green-700), var(--green-500));
+}
+
+.session-button.is-stop {
+  background: linear-gradient(135deg, #215a35, #123520);
+}
+
+.session-button.is-live {
+  box-shadow:
+    0 18px 30px rgba(29, 107, 57, 0.18),
+    0 0 0 3px rgba(94, 181, 117, 0.16);
+}
+
 .record-button.is-active {
   background: linear-gradient(135deg, #2a7e47, #175a32);
 }
 
 .secondary-button {
   min-width: 10rem;
+  justify-self: start;
 }
 
 .record-button:disabled,
