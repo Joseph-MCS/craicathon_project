@@ -55,6 +55,10 @@ type PronunciationRequest = {
   text?: string;
 };
 
+type SpeakRequest = {
+  text?: string;
+};
+
 type OpenAIErrorPayload = {
   error?: {
     message?: string;
@@ -852,6 +856,33 @@ app.post('/api/pronunciation', async (req, res) => {
     });
   } catch (error) {
     console.error('Pronunciation failed:', error);
+    return res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/speak', async (req, res) => {
+  const { text } = req.body as SpeakRequest;
+  const apiKey = resolveOpenAIKey(req);
+  const cleanText = typeof text === 'string' ? text.trim() : '';
+
+  if (!cleanText) {
+    return res.status(400).json({ error: 'Text is required.' });
+  }
+
+  if (cleanText.length > 600) {
+    return res.status(400).json({ error: 'Text is too long.' });
+  }
+
+  try {
+    ensureConfiguredWithKey(apiKey);
+    const speech = await synthesizeIrishReply(cleanText, apiKey as string);
+
+    return res.json({
+      ...speech,
+      voiceDisclosure: VOICE_DISCLOSURE
+    });
+  } catch (error) {
+    console.error('Speak failed:', error);
     return res.status(500).json({ error: getErrorMessage(error) });
   }
 });
